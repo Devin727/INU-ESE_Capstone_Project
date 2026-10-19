@@ -1,0 +1,79 @@
+# 배관 코스 정의 (단위 m, 각도 deg)
+# 규격 근거: KS M 3404 / JIS K 6741 (VG1=VP), KS M 3410 / JIS K 6739 (DV), KS M 3402 / JIS K 6743 (TS)
+# 엘보 R은 제조사 공개값이 없어 "순수 원호" 가정의 상한값임 -> 실물 엘보를 캘리퍼스로 재서 고칠 것
+
+pipe:
+  inner_d: 0.1008      # VG1 100A: 외경 114 - 2 x 6.6(최소 두께). 실제는 98.4~101.2 범위
+  wall: 0.0066
+  collision_wall: 0.03  # 충돌 판정용 벽 두께 (바퀴 반경 12mm보다 두껍게)
+  staves: 24           # 원주 분할 수 (박스 개수)
+  slice_deg: 5.0       # 엘보 길이 방향 분할 각도
+  axis_height: 0.057   # 배관 중심 높이 (바닥에 놓인 상태 = 외경/2)
+
+# Z: 엘보 중심 ~ 소켓 바닥(파이프 끝이 닿는 곳), bore: 엘보 몸통 내경
+# 직선 다리 길이 = Z - R*tan(angle/2), 나머지는 반경 R 원호
+fittings:
+  dv90:    {angle: 90, R: 0.061, Z: 0.062, bore: 0.0988}   # 배수용 DV/DTS 90° (국내 판매 주력, "VG2" 표기). 실물은 91°10'
+  dv45:    {angle: 45, R: 0.072, Z: 0.030, bore: 0.0988}   # 배수용 DV 45°
+  dv_ll90: {angle: 90, R: 0.125, Z: 0.128, bore: 0.0988}   # 배수용 DV 대곡(LL) 90°. 국내 재고 드묾
+  ts90:    {angle: 90, R: 0.050, Z: 0.071, bore: 0.1000}   # 수도용 TS 90°. 안쪽 모서리 거의 직각 (R=내경/2로 근사)
+  ts45:    {angle: 45, R: 0.050, Z: 0.039, bore: 0.1000}   # 수도용 TS 45°
+
+# 코스: 순서대로 이어 붙임
+#   {straight: 길이}            VG1 직관
+#   {fitting: 이름, dir: left|right|up|down}
+#   {cap: true}                 끝 막음(마개)
+#   {start_z: 높이}             시작 높이 (맨 앞에만, 아래로 꺾이는 코스용)
+courses:
+  straight:
+    - {straight: 2.0}
+    - {cap: true}
+  elbow45:
+    - {straight: 1.0}
+    - {fitting: dv45, dir: left}
+    - {straight: 1.0}
+    - {cap: true}
+  elbow90:
+    - {straight: 1.0}
+    - {fitting: dv90, dir: left}
+    - {straight: 1.0}
+    - {cap: true}
+  demo:                 # 노션 데모 배관: 입구 - 1m - 45° - 0.5m - 90° - 1m - 막힘 (T자는 아직 없음)
+    - {straight: 1.0}
+    - {fitting: dv45, dir: left}
+    - {straight: 0.5}
+    - {fitting: dv90, dir: right}
+    - {straight: 1.0}
+    - {cap: true}
+  # ---- 위아래(z축) 방향 엘보 ----
+  elbow45_up:           # 45° 위로 꺾여 비스듬히 올라감
+    - {straight: 1.0}
+    - {fitting: dv45, dir: up}
+    - {straight: 0.6}
+    - {cap: true}
+  elbow45_down:
+    - {start_z: 0.6}
+    - {straight: 1.0}
+    - {fitting: dv45, dir: down}
+    - {straight: 0.6}
+    - {cap: true}
+  elbow90_up:           # 90° 위로 꺾여 수직으로 올라감 (수직관 등반)
+    - {straight: 1.0}
+    - {fitting: dv90, dir: up}
+    - {straight: 0.5}
+    - {cap: true}
+  elbow90_down:         # 90° 아래로 꺾여 수직으로 내려감
+    - {start_z: 0.8}
+    - {straight: 1.0}
+    - {fitting: dv90, dir: down}
+    - {straight: 0.5}
+    - {cap: true}
+  demo3d:               # 수평 + 수직 섞인 코스: 위로 45° - 다시 수평 - 왼쪽 90°
+    - {straight: 1.0}
+    - {fitting: dv45, dir: up}
+    - {straight: 0.4}
+    - {fitting: dv45, dir: down}
+    - {straight: 0.5}
+    - {fitting: dv90, dir: left}
+    - {straight: 0.8}
+    - {cap: true}

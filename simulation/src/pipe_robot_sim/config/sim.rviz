@@ -1,0 +1,62 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 0.1
+      Plane Cell Count: 40
+      Reference Frame: <Fixed Frame>
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Pipe
+      Enabled: true
+      Topic:
+        Value: /pipe_markers
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+    - Class: rviz_default_plugins/RobotModel
+      Name: Robot (정답 위치)
+      Enabled: true
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+        Durability Policy: Transient Local
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Show Names: false
+      Marker Scale: 0.05
+      Frames:
+        All Enabled: false
+        world: {Value: true}
+        base_link: {Value: true}
+        base_link_est: {Value: true}
+    - Class: rviz_default_plugins/Path
+      Name: 정답 경로
+      Enabled: true
+      Color: 50; 200; 50
+      Topic:
+        Value: /ground_truth/path
+    - Class: rviz_default_plugins/Path
+      Name: 추정 경로 (엔코더+IMU)
+      Enabled: true
+      Color: 230; 50; 50
+      Topic:
+        Value: /odom_path
+  Global Options:
+    Fixed Frame: world
+    Background Color: 48; 48; 48
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 1.2
+      Focal Point: {X: 0.4, Y: 0, Z: 0.05}
+      Pitch: 0.6
+      Yaw: 3.6
+      Target Frame: <Fixed Frame>
