@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!-- V자형 100mm 로봇의 전륜 구동판: 모양은 vshape100 과 같고, 앞 옴니휠 2개만 구동 (뒤 2개는 자유 회전).
+     제어는 robot.yaml 의 imu_assist (IMU 롤 유지 + 자이로 기반 좌우 속도차) -->
+<robot name="vshape100_fwd" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="rear_drive" default="false"/>
+  <xacro:include filename="$(find pipe_robot_sim)/models/vshape100/vshape100.urdf.xacro"/>
+</robot>

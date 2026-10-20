@@ -1,0 +1,177 @@
+<?xml version="1.0"?>
+<!-- AIRo-7.1 (Murata & Kakogawa, arXiv 2411.03660, docs/09 참고)
+     구조: 링크 4개, 관절 3개 (모두 같은 평면에서 굽힘, 축 y)
+       - 앞·뒤 관절 j1, j3: 토션 스프링 (수동 탄성)
+       - 가운데 관절 j2: 능동 (기어 감속비 약 200, 연속 2.56 N·m / 최대 12.32 N·m)
+       - 관절마다 옴니휠 한 쌍 (구동, 관절축과 같은 축)
+       - 양 끝: 굴림 바퀴 (링크 축 둘레로 구동해 로봇을 배관 축 둘레로 굴림 + 진행 방향으로는 자유 회전)
+     배관 안에서는 지그재그로 굽혀 옴니휠·끝 바퀴가 위아래 벽을 번갈아 누름. 굽힘 평면을 엘보 방향에 맞출 때 굴림 바퀴를 씀.
+     좌표: 앞(카메라 쪽) = +x, 위 = z. base_link = 링크 1, 원점은 링크 1 중심. 관절 0 = 일자로 편 자세.
+     [논문 값] 전장 0.51 m, 질량 1.57 kg, 관절 토크, 최고 속도 0.088 m/s
+     [추정] 링크 길이, 단면, 바퀴 반경, 스프링 강성, 질량 배분 (논문에 수치 없음, CAD 그림 비율로 추정) -->
+<robot name="airo71" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="pipe_inner_d" default="0.1008"/>
+  <xacro:arg name="params_file" default=""/>
+  <xacro:arg name="suspension" default="all"/>
+  <xacro:include filename="$(find pipe_robot_sim)/models/common/common.xacro"/>
+
+  <!-- ===== 치수 (추정: 전장 2*Le + 2*Lm + 2*re ≈ 0.51 m 에 맞춤) ===== -->
+  <xacro:property name="Le" value="0.13"/>         <!-- 끝 바퀴 중심 ~ 이웃 관절 -->
+  <xacro:property name="Lm" value="0.10"/>         <!-- 가운데 링크: 관절 ~ 관절 -->
+  <xacro:property name="bw" value="0.034"/>        <!-- 몸통 단면 (정사각) -->
+  <xacro:property name="ro" value="0.021"/>        <!-- 옴니휠 반경 -->
+  <xacro:property name="o_w" value="0.010"/>       <!-- 옴니휠 폭 -->
+  <xacro:property name="o_row" value="0.0"/>      <!-- 한 평면 (common.xacro 옴니휠 주석) -->
+  <xacro:property name="o_rr" value="0.004"/>
+  <xacro:property name="o_n" value="8"/>        <!-- 줄당 8개 (합 16개) -->
+  <xacro:property name="yo" value="${bw/2 + o_w/2 + 0.002}"/>   <!-- 옴니휠 중심의 좌우 위치 -->
+  <xacro:property name="re" value="0.024"/>        <!-- 끝 굴림 바퀴 반경 -->
+
+  <!-- 질량 (총 1.57 kg, 논문). 배분은 추정 -->
+  <xacro:property name="m_end" value="0.29"/>      <!-- 링크 1, 4: 굴림 모터, 카메라, 회로 -->
+  <xacro:property name="m_l2" value="0.21"/>
+  <xacro:property name="m_l3" value="0.22"/>       <!-- 능동 관절 모터·기어 -->
+  <xacro:property name="m_hub" value="0.012"/>
+  <xacro:property name="m_roller" value="0.004"/>
+  <xacro:property name="m_fork" value="0.02"/>
+  <xacro:property name="m_endwheel" value="0.03"/>
+
+  <!-- 관절: 능동 j2 는 위치 제어 + 토크 한계 2.56 N·m (논문 연속 토크). 스프링 강성은 논문에 없음 -> 추정 1.5 N·m/rad -->
+  <xacro:property name="j2_torque" value="2.56"/>
+  <xacro:property name="spring_k" value="1.5"/>
+  <xacro:property name="joint_lim" value="1.2"/>
+
+  <!-- 마찰 (고무 롤러·바퀴, 추정) -->
+  <xacro:property name="mu_omni" value="0.7"/>
+  <xacro:property name="mu_end" value="0.7"/>
+
+  <!-- 바퀴 모터: 최고 속도 0.088 m/s / 반경 0.021 -> 무부하 약 4.2 rad/s. 견인력 151 N / 6바퀴 -> 바퀴당 연속 약 0.5 N·m
+       스톨 토크 추정 1.0 N·m. 감쇠 = 스톨 / 무부하 (robot.yaml 과 같게) -->
+  <xacro:property name="wheel_damping" value="${1.0/4.2}"/>
+
+  <!-- ===== 링크 1 (base_link, 앞) ===== -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="${-re/2} 0 0" rpy="0 0 0"/>
+      <geometry><box size="${Le - re} ${bw} ${bw}"/></geometry>
+      <material name="body_blue"><color rgba="0.2 0.4 0.85 1"/></material>
+    </visual>
+    <collision>
+      <origin xyz="${-re/2} 0 0" rpy="0 0 0"/>
+      <geometry><box size="${Le - re} ${bw} ${bw}"/></geometry>
+    </collision>
+    <!-- NTSC 카메라 (앞면) -->
+    <visual>
+      <origin xyz="${Le/2 - re + 0.003} 0 ${bw/2 - 0.008}" rpy="0 ${pi/2} 0"/>
+      <geometry><cylinder radius="0.005" length="0.006"/></geometry>
+      <material name="cam_black"><color rgba="0.05 0.05 0.05 1"/></material>
+    </visual>
+    <xacro:inertial_box m="${m_end}" x="${Le - re}" y="${bw}" z="${bw}" xyz="${-re/2} 0 0"/>
+  </link>
+
+  <!-- 끝 굴림 바퀴: 굴림 관절(링크 축, 구동) -> 포크 -> 바퀴 관절(진행 방향, 자유) -> 바퀴 -->
+  <xacro:macro name="end_wheel" params="prefix parent x">
+    <joint name="${prefix}_roll_joint" type="continuous">
+      <parent link="${parent}"/>
+      <child link="${prefix}_roll_fork"/>
+      <origin xyz="${x} 0 0" rpy="0 0 0"/>
+      <axis xyz="1 0 0"/>
+      <dynamics damping="0.05" friction="0"/>
+    </joint>
+    <link name="${prefix}_roll_fork">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 ${pi/2} 0"/>
+        <geometry><cylinder radius="0.010" length="0.012"/></geometry>
+        <material name="motor_grey"><color rgba="0.55 0.55 0.6 1"/></material>
+      </visual>
+      <xacro:inertial_cyl m="${m_fork}" r="0.010" l="0.012" rpy="0 ${pi/2} 0"/>
+    </link>
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <parent link="${prefix}_roll_fork"/>
+      <child link="${prefix}_wheel"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <dynamics damping="0.0005" friction="0"/>
+    </joint>
+    <link name="${prefix}_wheel">
+      <visual>
+        <geometry><sphere radius="${re}"/></geometry>
+        <material name="wheel_black"><color rgba="0.1 0.1 0.1 1"/></material>
+      </visual>
+      <collision>
+        <geometry><sphere radius="${re}"/></geometry>
+      </collision>
+      <xacro:inertial_sphere m="${m_endwheel}" r="${re}"/>
+    </link>
+    <xacro:friction link="${prefix}_wheel" mu="${mu_end}"/>
+    <xacro:joint_force joint="${prefix}_roll_joint"/>
+  </xacro:macro>
+
+  <!-- 관절 하나 + 그 자리의 옴니휠 쌍 (옴니휠은 앞쪽 링크에 붙음) -->
+  <xacro:macro name="joint_with_omni" params="jname parent child x">
+    <xacro:omni_wheel name="${jname}_left_omni" parent="${parent}" xyz="${x} ${yo} 0"
+                      R="${ro}" width="${o_w}" n="${o_n}" rr="${o_rr}" row="${o_row}"
+                      hub_mass="${m_hub}" roller_mass="${m_roller}" mu="${mu_omni}" damping="${wheel_damping}"/>
+    <xacro:omni_wheel name="${jname}_right_omni" parent="${parent}" xyz="${x} ${-yo} 0"
+                      R="${ro}" width="${o_w}" n="${o_n}" rr="${o_rr}" row="${o_row}"
+                      hub_mass="${m_hub}" roller_mass="${m_roller}" mu="${mu_omni}" damping="${wheel_damping}"/>
+    <xacro:joint_force joint="${jname}_left_omni_joint"/>
+    <xacro:joint_force joint="${jname}_right_omni_joint"/>
+    <joint name="${jname}_joint" type="revolute">
+      <parent link="${parent}"/>
+      <child link="${child}"/>
+      <origin xyz="${x} 0 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="${-joint_lim}" upper="${joint_lim}" effort="12.32" velocity="3.0"/>
+      <dynamics damping="0.02" friction="0"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- 가운데 링크 몸통 (관절에서 -x 로 Lm) -->
+  <xacro:macro name="mid_link" params="name mass">
+    <link name="${name}">
+      <visual>
+        <origin xyz="${-Lm/2} 0 0" rpy="0 0 0"/>
+        <geometry><box size="${Lm - 0.01} ${bw} ${bw}"/></geometry>
+        <material name="body_blue"/>
+      </visual>
+      <collision>
+        <origin xyz="${-Lm/2} 0 0" rpy="0 0 0"/>
+        <geometry><box size="${Lm - 0.01} ${bw} ${bw}"/></geometry>
+      </collision>
+      <xacro:inertial_box m="${mass}" x="${Lm}" y="${bw}" z="${bw}" xyz="${-Lm/2} 0 0"/>
+    </link>
+  </xacro:macro>
+
+  <!-- ===== 연결 ===== -->
+  <xacro:end_wheel prefix="front" parent="base_link" x="${Le/2}"/>
+
+  <xacro:joint_with_omni jname="j1" parent="base_link" child="link2" x="${-Le/2}"/>
+  <xacro:joint_spring joint="j1_joint" k="${spring_k}" ref="0"/>
+  <xacro:mid_link name="link2" mass="${m_l2}"/>
+
+  <xacro:joint_with_omni jname="j2" parent="link2" child="link3" x="${-Lm}"/>
+  <xacro:joint_servo joint="j2_joint" p="10" d="0.1" tmax="${j2_torque}"/>
+  <xacro:mid_link name="link3" mass="${m_l3}"/>
+
+  <xacro:joint_with_omni jname="j3" parent="link3" child="link4" x="${-Lm}"/>
+  <xacro:joint_spring joint="j3_joint" k="${spring_k}" ref="0"/>
+
+  <!-- 링크 4 (뒤): 관절 j3 에서 -x 로 Le, 끝에 굴림 바퀴 -->
+  <link name="link4">
+    <visual>
+      <origin xyz="${-(Le - re)/2} 0 0" rpy="0 0 0"/>
+      <geometry><box size="${Le - re} ${bw} ${bw}"/></geometry>
+      <material name="body_blue"/>
+    </visual>
+    <collision>
+      <origin xyz="${-(Le - re)/2} 0 0" rpy="0 0 0"/>
+      <geometry><box size="${Le - re} ${bw} ${bw}"/></geometry>
+    </collision>
+    <xacro:inertial_box m="${m_end}" x="${Le - re}" y="${bw}" z="${bw}" xyz="${-(Le - re)/2} 0 0"/>
+  </link>
+  <xacro:end_wheel prefix="rear" parent="link4" x="${-Le}"/>
+
+  <!-- ===== 시뮬 플러그인 (IMU 는 논문에 없음, 위치추정 비교용으로 추가) ===== -->
+  <xacro:sim_common imu_parent="base_link"/>
+</robot>

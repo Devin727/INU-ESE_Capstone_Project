@@ -28,12 +28,16 @@ def q_mul(a, b):
                      w1*y2 - x1*z2 + y1*w2 + z1*x2, w1*z2 + x1*y2 - y1*x2 + z1*w2])
 
 
-def q_rot(q, v):
+def quat_to_rot(q):
+    """[w x y z] -> 3x3 회전 행렬."""
     w, x, y, z = q
-    r = np.array([[1 - 2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y)],
-                  [2*(x*y + w*z), 1 - 2*(x*x + z*z), 2*(y*z - w*x)],
-                  [2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x*x + y*y)]])
-    return r @ v
+    return np.array([[1 - 2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y)],
+                     [2*(x*y + w*z), 1 - 2*(x*x + z*z), 2*(y*z - w*x)],
+                     [2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x*x + y*y)]])
+
+
+def q_rot(q, v):
+    return quat_to_rot(q) @ v
 
 
 def q_from_msg(o):

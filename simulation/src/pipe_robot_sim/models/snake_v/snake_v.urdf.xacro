@@ -1,0 +1,185 @@
+<?xml version="1.0"?>
+<!-- 뱀형 V자 로봇 (PIRATE 방식, arXiv 2107.03685 그림 참고, 100mm 배관에 맞춰 새로 정한 치수)
+     뒤 -> 앞:  w1 ─ r1 ─ J1(w2) ─ r2 ─ J2(w3) ─ [가운데 링크: mid_rear ─ J3(비틀기) ─ base_link] ─ J4(w4) ─ f1 ─ J5(w5) ─ f2 ─ J6(w6) ─ 머리
+       - 뒤 V: w1(아래) · J1(위) · J2(아래),  앞 V: J4(아래) · J5(위) · J6(아래)  -> 각 V가 위아래 벽을 눌러 버팀
+       - J3: 가운데 링크를 몸통 축 둘레로 비틂 -> 앞쪽 굽힘 평면을 엘보 방향으로 돌림
+       - 관절마다 일반 바퀴 한 쌍 (12개 모두 구동). 바퀴 축 = 관절 축
+     관절은 모두 서보 (/servo/<관절>, rad). 토크 한계(tmax)가 곧 벽을 누르는 힘의 상한.
+     관절 0 = 일자로 편 자세. 제어 노드(snake_gait)가 V를 만들어 벽을 누름.
+     좌표: base_link = 가운데 링크 앞쪽 반 (J3 ~ J4), 원점 = J3, 앞 = +x, 위 = z.
+     부호: 앞쪽 사슬(J4, J5, J6)은 +q 면 앞 끝이 내려감, 뒤쪽 사슬(J2, J1)은 +q 면 뒤 끝이 올라감.
+     치수는 모두 이 프로젝트에서 정한 값 (원 논문 치수 없음). docs/08 -->
+<robot name="snake_v" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="pipe_inner_d" default="0.1008"/>
+  <xacro:arg name="params_file" default=""/>
+  <xacro:arg name="suspension" default="all"/>
+  <xacro:include filename="$(find pipe_robot_sim)/models/common/common.xacro"/>
+
+  <!-- ===== 치수 ===== -->
+  <xacro:property name="L" value="0.085"/>      <!-- V 팔 (관절 ~ 관절) -->
+  <xacro:property name="Lm" value="0.10"/>      <!-- 가운데 링크 (J2 ~ J4), 가운데에 J3 -->
+  <xacro:property name="Lh" value="0.05"/>      <!-- 머리 (J6 ~ 앞 끝) -->
+  <xacro:property name="bw" value="0.018"/>     <!-- 링크 단면 (정사각) -->
+  <xacro:property name="rw" value="0.015"/>     <!-- 바퀴 반경 (Ø30) -->
+  <xacro:property name="ww" value="0.010"/>     <!-- 바퀴 폭 -->
+  <xacro:property name="yw" value="0.016"/>     <!-- 바퀴 중심의 좌우 위치 (±) -->
+
+  <!-- 질량 (링크 안 서보 포함, 추정). 총 약 0.75 kg -->
+  <xacro:property name="m_arm" value="0.07"/>   <!-- V 팔 4개 -->
+  <xacro:property name="m_mid" value="0.08"/>   <!-- 가운데 링크 반쪽 2개 (배터리·보드) -->
+  <xacro:property name="m_head" value="0.06"/>
+  <xacro:property name="m_wheel" value="0.012"/>
+
+  <!-- 바퀴 모터: N20 1:100 추정 (스톨 0.147 N·m, 무부하 16.8 rad/s), 감쇠 = 스톨/무부하 -->
+  <xacro:property name="wheel_damping" value="${0.147/16.8}"/>
+  <xacro:property name="mu_wheel" value="0.8"/>   <!-- 고무 바퀴 ↔ PVC, 추정 -->
+
+  <!-- 관절 서보 (추정): 꼭짓점 J1, J5 = 누르는 관절, 나머지 = 자세 유지 -->
+  <xacro:property name="t_clamp" value="1.2"/>    <!-- J1, J5 토크 한계 [N·m] -->
+  <xacro:property name="t_hold" value="1.0"/>     <!-- J2, J4, J6 -->
+  <xacro:property name="t_roll" value="0.5"/>     <!-- J3 -->
+  <xacro:property name="jlim" value="${radians(120)}"/>
+  <!-- 서보 감쇠는 관절 damping 으로 (DART 가 암시적으로 적분 -> 안정). 제어기 d_gain 은 0:
+       d_gain 은 오차의 미분이라 목표가 바뀔 때마다(50 Hz) 한 스텝 동안 최대 토크로 차서 관절이 속도 한계(3 rad/s)로
+       떨렸음 (2026-10-20, 이전 d_gain 0.05 + damping 0.02) -->
+  <xacro:property name="servo_damping" value="0.07"/>
+
+  <!-- ===== 매크로 ===== -->
+  <xacro:macro name="arm_link" params="name dir length mass">
+    <!-- dir = +1: 관절에서 +x 로 뻗음, -1: -x 로 -->
+    <link name="${name}">
+      <visual>
+        <origin xyz="${dir*length/2} 0 0" rpy="0 0 0"/>
+        <geometry><box size="${length - 2*rw*0.4} ${bw} ${bw}"/></geometry>
+        <material name="snake_white"><color rgba="0.9 0.9 0.92 1"/></material>
+      </visual>
+      <collision>
+        <origin xyz="${dir*length/2} 0 0" rpy="0 0 0"/>
+        <geometry><box size="${length - 2*rw*1.1} ${bw} ${bw}"/></geometry>
+      </collision>
+      <xacro:inertial_box m="${mass}" x="${length}" y="${bw}" z="${bw}" xyz="${dir*length/2} 0 0"/>
+    </link>
+  </xacro:macro>
+
+  <!-- 바퀴 한 쌍 (구동). name_l / name_r, 충돌체는 구 (배관 곡면과 접촉이 안정적)
+       spin = -1: 위 벽에 닿는 꼭짓점 바퀴 (J1, J5). 축을 뒤집어 같은 + 속도 명령에 로봇이 앞으로 가게 함 -->
+  <xacro:macro name="wheel_pair" params="name parent x spin:=1">
+    <xacro:wheel name="${name}_l" parent="${parent}" x="${x}" side="1" spin="${spin}"/>
+    <xacro:wheel name="${name}_r" parent="${parent}" x="${x}" side="-1" spin="${spin}"/>
+  </xacro:macro>
+  <xacro:macro name="wheel" params="name parent x side spin">
+    <joint name="${name}_joint" type="continuous">
+      <parent link="${parent}"/>
+      <child link="${name}"/>
+      <origin xyz="${x} ${side*yw} 0" rpy="0 0 0"/>
+      <axis xyz="0 ${spin} 0"/>
+      <dynamics damping="${wheel_damping}" friction="0"/>
+    </joint>
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="${rw}" length="${ww}"/></geometry>
+        <material name="tire_black"><color rgba="0.12 0.12 0.12 1"/></material>
+      </visual>
+      <visual>   <!-- 회전이 보이게 하는 표시 -->
+        <origin xyz="0 ${side*ww/2} 0" rpy="${pi/2} 0 0"/>
+        <geometry><box size="${1.6*rw} 0.004 0.001"/></geometry>
+        <material name="mark_yellow"><color rgba="0.95 0.8 0.1 1"/></material>
+      </visual>
+      <collision>
+        <geometry><sphere radius="${rw}"/></geometry>
+      </collision>
+      <xacro:inertial_cyl m="${m_wheel}" r="${rw}" l="${ww}" rpy="${pi/2} 0 0"/>
+    </link>
+    <xacro:friction link="${name}" mu="${mu_wheel}"/>
+    <xacro:joint_force joint="${name}_joint"/>
+  </xacro:macro>
+
+  <xacro:macro name="pitch_joint" params="name parent child x tmax p">
+    <joint name="${name}" type="revolute">
+      <parent link="${parent}"/>
+      <child link="${child}"/>
+      <origin xyz="${x} 0 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="${-jlim}" upper="${jlim}" effort="${tmax}" velocity="3.0"/>
+      <dynamics damping="${servo_damping}" friction="0"/>
+    </joint>
+    <xacro:joint_servo joint="${name}" p="${p}" d="0" tmax="${tmax}"/>
+  </xacro:macro>
+
+  <!-- ===== 가운데 링크 ===== -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="${Lm/4} 0 0" rpy="0 0 0"/>
+      <geometry><box size="${Lm/2 - 0.004} ${bw*1.2} ${bw*1.2}"/></geometry>
+      <material name="snake_blue"><color rgba="0.25 0.45 0.85 1"/></material>
+    </visual>
+    <collision>
+      <origin xyz="${Lm/4 - rw*0.55} 0 0" rpy="0 0 0"/>
+      <geometry><box size="${Lm/2 - rw*1.1} ${bw} ${bw}"/></geometry>
+    </collision>
+    <xacro:inertial_box m="${m_mid}" x="${Lm/2}" y="${bw}" z="${bw}" xyz="${Lm/4} 0 0"/>
+  </link>
+
+  <!-- J3: 비틀기 (축 x) -->
+  <joint name="j3_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="mid_rear"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="${-pi}" upper="${pi}" effort="${t_roll}" velocity="3.0"/>
+    <dynamics damping="${servo_damping}" friction="0"/>
+  </joint>
+  <xacro:joint_servo joint="j3_joint" p="3" d="0" tmax="${t_roll}"/>
+  <link name="mid_rear">
+    <visual>
+      <origin xyz="${-Lm/4} 0 0" rpy="0 0 0"/>
+      <geometry><box size="${Lm/2 - 0.004} ${bw*1.2} ${bw*1.2}"/></geometry>
+      <material name="snake_blue"/>
+    </visual>
+    <collision>
+      <origin xyz="${-Lm/4 + rw*0.55} 0 0" rpy="0 0 0"/>
+      <geometry><box size="${Lm/2 - rw*1.1} ${bw} ${bw}"/></geometry>
+    </collision>
+    <xacro:inertial_box m="${m_mid}" x="${Lm/2}" y="${bw}" z="${bw}" xyz="${-Lm/4} 0 0"/>
+  </link>
+
+  <!-- ===== 앞쪽: J4(w4) ─ f1 ─ J5(w5) ─ f2 ─ J6(w6) ─ 머리 ===== -->
+  <xacro:wheel_pair name="w4" parent="base_link" x="${Lm/2}"/>
+  <xacro:pitch_joint name="j4_joint" parent="base_link" child="f1" x="${Lm/2}" tmax="${t_hold}" p="2"/>
+  <xacro:arm_link name="f1" dir="1" length="${L}" mass="${m_arm}"/>
+  <xacro:wheel_pair name="w5" parent="f1" x="${L}" spin="-1"/>
+  <xacro:pitch_joint name="j5_joint" parent="f1" child="f2" x="${L}" tmax="${t_clamp}" p="2"/>
+  <xacro:arm_link name="f2" dir="1" length="${L}" mass="${m_arm}"/>
+  <xacro:wheel_pair name="w6" parent="f2" x="${L}"/>
+  <xacro:pitch_joint name="j6_joint" parent="f2" child="head" x="${L}" tmax="${t_hold}" p="2"/>
+  <link name="head">
+    <visual>
+      <origin xyz="${Lh/2} 0 0" rpy="0 ${pi/2} 0"/>
+      <geometry><cylinder radius="${bw*0.7}" length="${Lh}"/></geometry>
+      <material name="snake_white"/>
+    </visual>
+    <visual>   <!-- 카메라 -->
+      <origin xyz="${Lh} 0 0" rpy="0 ${pi/2} 0"/>
+      <geometry><cylinder radius="0.006" length="0.004"/></geometry>
+      <material name="cam_black"><color rgba="0.05 0.05 0.05 1"/></material>
+    </visual>
+    <collision>
+      <origin xyz="${Lh/2 + rw*0.5} 0 0" rpy="0 ${pi/2} 0"/>
+      <geometry><cylinder radius="${bw*0.7}" length="${Lh - rw}"/></geometry>
+    </collision>
+    <xacro:inertial_cyl m="${m_head}" r="${bw*0.7}" l="${Lh}" xyz="${Lh/2} 0 0" rpy="0 ${pi/2} 0"/>
+  </link>
+
+  <!-- ===== 뒤쪽: J2(w3) ─ r2 ─ J1(w2) ─ r1 ─ w1 ===== -->
+  <xacro:wheel_pair name="w3" parent="mid_rear" x="${-Lm/2}"/>
+  <xacro:pitch_joint name="j2_joint" parent="mid_rear" child="r2" x="${-Lm/2}" tmax="${t_hold}" p="2"/>
+  <xacro:arm_link name="r2" dir="-1" length="${L}" mass="${m_arm}"/>
+  <xacro:wheel_pair name="w2" parent="r2" x="${-L}" spin="-1"/>
+  <xacro:pitch_joint name="j1_joint" parent="r2" child="r1" x="${-L}" tmax="${t_clamp}" p="2"/>
+  <xacro:arm_link name="r1" dir="-1" length="${L}" mass="${m_arm}"/>
+  <xacro:wheel_pair name="w1" parent="r1" x="${-L}"/>
+
+  <!-- ===== 시뮬 플러그인 (IMU 는 가운데 링크) ===== -->
+  <xacro:sim_common imu_parent="base_link" imu_xyz="${Lm/4} 0 0"/>
+</robot>

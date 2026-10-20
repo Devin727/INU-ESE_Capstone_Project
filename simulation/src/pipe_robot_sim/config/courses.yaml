@@ -38,6 +38,11 @@ courses:
     - {fitting: dv90, dir: left}
     - {straight: 1.0}
     - {cap: true}
+  elbow90_right:
+    - {straight: 1.0}
+    - {fitting: dv90, dir: right}
+    - {straight: 1.0}
+    - {cap: true}
   demo:                 # 노션 데모 배관: 입구 - 1m - 45° - 0.5m - 90° - 1m - 막힘 (T자는 아직 없음)
     - {straight: 1.0}
     - {fitting: dv45, dir: left}

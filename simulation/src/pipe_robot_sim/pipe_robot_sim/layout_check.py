@@ -1,13 +1,17 @@
 """부품 배치 검사: models/<model>/layout.yaml 의 부품이 마디 안에 들어가는지.
 
-ros2 run pipe_robot_sim layout_check two_real [--apply]
+ros2 run pipe_robot_sim layout_check <모델> [--apply] [--plot 배치도.png]
 
 검사 항목 (external 부품은 1번 제외)
   1. 몸통 안쪽(외경 - 2 x 벽) 과 마디 길이 안에 있는가
   2. 바퀴 모듈 공간(바퀴 고리 ±x_half, 각 바퀴 방향 반폭, 반경 r_min 바깥) 을 침범하지 않는가
   3. 다른 부품과 겹치지 않는가
 출력: 문제 목록, 마디별 질량·무게중심, models/<model>/components.urdf.xacro (Gazebo 에 보이는 부품 상자)
---apply: robot.yaml 의 seg_len, seg_mass, seg_com, spawn_x 갱신 (소스 폴더)
+--apply: robot.yaml 의 seg_len, seg_mass, seg_com, spawn_x, body_len 갱신 (소스 폴더)
+
+layout.yaml 의 segments 는 앞마디부터 순서대로 적는다. 마디마다
+  link     : 부품 상자를 붙일 URDF 링크 이름 (components.urdf.xacro 용)
+  x_offset : 그 링크 원점에서 마디 중심까지 x 거리 [m] (기본 0)
 """
 import argparse
 import math
@@ -17,7 +21,8 @@ import re
 import numpy as np
 import yaml
 
-SRC_MODELS = os.path.expanduser('~/Capstone_sim/src/pipe_robot_sim/models')
+# 소스 폴더의 models/ (--symlink-install 빌드라 이 파일의 실제 경로가 src/ 안을 가리킴)
+SRC_MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'models')
 
 
 def samples(part, n=7):
@@ -109,11 +114,8 @@ COLORS = {'cell': '0.9 0.6 0.1', 'esp32': '0.1 0.5 0.9', 'pi': '0.1 0.7 0.3', 's
           'probe': '0.8 0.8 0.85', 'pump': '0.6 0.2 0.8', 'tank': '0.6 0.8 1.0', 'stepper': '0.4 0.4 0.4'}
 
 
-def write_xacro(layout, report, robot_params, path):
-    gap = robot_params['joint_gap']
-    links = {'front': ('base_link', 0.0)}
-    L1 = layout['segments']['rear']['length'] / 1000 if 'rear' in layout['segments'] else 0
-    links['rear'] = ('mid_link', -(gap / 2 + L1 / 2))
+def write_xacro(layout, report, path):
+    links = {name: (seg['link'], seg.get('x_offset', 0.0)) for name, seg in layout['segments'].items()}
     out = ['<?xml version="1.0"?>', '<!-- layout_check 로 생성: layout.yaml 의 부품 (보이기만, 충돌·질량 없음). 빨강 = 배치 문제 -->',
            '<robot xmlns:xacro="http://www.ros.org/wiki/xacro">']
     for seg_name, seg in layout['segments'].items():
@@ -144,13 +146,16 @@ def write_xacro(layout, report, robot_params, path):
 
 def apply_params(path, report, robot_params):
     s = open(path, encoding='utf-8').read()
-    f, r = report['front'], report['rear']
-    gap = robot_params['joint_gap']
-    seg_len = f'[{f["length"] / 1000:.3f}, {r["length"] / 1000:.3f}, 0.0]'
-    seg_mass = f'[{f["mass"] / 1000:.3f}, {r["mass"] / 1000:.3f}, 0.0]'
-    # ROS 2 파라미터는 중첩 리스트 불가 -> [앞 x,y,z, 뒤 x,y,z, 0,0,0] 한 줄
-    seg_com = '[' + ', '.join(f'{v / 1000:.4f}' for seg in (f, r) for v in seg['com']) + ', 0.0, 0.0, 0.0]'
-    spawn = f['length'] / 1000 + gap + r['length'] / 1000 - f['length'] / 2000 + 0.02
+    segs = list(report.values())             # 앞마디부터
+    f = segs[0]
+    gap = robot_params.get('joint_gap', 0.0)
+    seg_len = '[' + ', '.join(f'{r["length"] / 1000:.3f}' for r in segs) + ']'
+    seg_mass = '[' + ', '.join(f'{r["mass"] / 1000:.3f}' for r in segs) + ']'
+    # ROS 2 파라미터는 중첩 리스트 불가 -> [마디1 x,y,z, 마디2 x,y,z, ...] 한 줄
+    seg_com = '[' + ', '.join(f'{v / 1000:.4f}' for r in segs for v in r['com']) + ']'
+    # 로봇 전체가 입구 안쪽에 들어가도록: 앞마디 중심 = 전체 길이 - 앞마디 절반 + 여유 20 mm
+    total = sum(r['length'] for r in segs) / 1000 + gap * (len(segs) - 1)
+    spawn = total - f['length'] / 2000 + 0.02
     for k, v in [('seg_len', seg_len), ('seg_mass', seg_mass), ('seg_com', seg_com), ('spawn_x', f'{spawn:.3f}'),
                  ('body_len', f'{f["length"] / 1000:.3f}')]:
         if re.search(rf'^    {k}:', s, re.M):
@@ -160,7 +165,7 @@ def apply_params(path, report, robot_params):
     open(path, 'w', encoding='utf-8').write(s)
 
 
-def plot(layout, report, robot_params, path):
+def plot(layout, report, robot_params, path, model=''):
     """배치도: 옆(x-z), 위(x-y), 바퀴 고리 단면(y-z). 빨강 = 문제 부품"""
     import matplotlib
     matplotlib.use('Agg')
@@ -169,7 +174,7 @@ def plot(layout, report, robot_params, path):
     plt.rcParams['font.family'] = ['NanumGothic', 'Noto Sans CJK JP', 'Noto Serif CJK JP', 'DejaVu Sans']
     hull, wm = layout['hull'], layout['wheel_module']
     R, r_in = hull['outer_d'] / 2, hull['outer_d'] / 2 - hull['wall']
-    gap = robot_params['joint_gap'] * 1000
+    gap = robot_params.get('joint_gap', 0.0) * 1000
     segs = list(layout['segments'].items())
     offs, x = [], 0.0
     for i, (_, seg) in enumerate(segs):           # 앞마디 중심 = 0, 뒤로 갈수록 -
@@ -180,7 +185,8 @@ def plot(layout, report, robot_params, path):
             offs.append(x - gap - seg['length'] / 2)
             x = offs[-1] - seg['length'] / 2
     fig = plt.figure(figsize=(15, 9))
-    axs = [fig.add_subplot(2, 1, 1), fig.add_subplot(2, 3, 4), fig.add_subplot(2, 3, 5), fig.add_subplot(2, 3, 6)]
+    n = len(segs)
+    axs = [fig.add_subplot(2, 1, 1)] + [fig.add_subplot(2, n, n + i + 1) for i in range(n)]
     side, top = axs[0], None
     titles = ['옆에서 본 단면 (x-z, 오른쪽이 앞)']
     for (name, seg), off in zip(segs, offs):
@@ -207,9 +213,8 @@ def plot(layout, report, robot_params, path):
     side.set_xlim(offs[-1] - segs[-1][1]['length'] / 2 - 15, segs[0][1]['length'] / 2 + 20)
     side.set_ylim(-R - 40, R + 12)
     side.set_title(titles[0] + ' — 회색 띠 = 바퀴 고리(부품 금지)')
-    # 단면: 앞마디 바퀴 고리 / 뒷마디 바퀴 고리 / 뒷마디 앞쪽 구역
-    cuts = [(segs[0][0], 0.0, '앞마디 바퀴 고리 단면 (x=0)'), (segs[-1][0], 0.0, '뒷마디 바퀴 고리 단면 (x=0)'),
-            (segs[-1][0], 36.0, '뒷마디 앞쪽 단면 (x=+36)')]
+    # 단면: 마디마다 가운데 (바퀴 고리 위치, x=0)
+    cuts = [(name, 0.0, f'{name} 마디 단면 (x=0)') for name, _ in segs]
     for ax, (name, xc, ttl) in zip(axs[1:], cuts):
         ax.add_patch(patches.Circle((0, 0), R, fill=False, lw=1.5))
         ax.add_patch(patches.Circle((0, 0), r_in, fill=False, lw=0.5, ls='--'))
@@ -248,7 +253,7 @@ def plot(layout, report, robot_params, path):
         ax.set_ylim(-55, 55)
         ax.set_title(ttl, fontsize=9)
         ax.invert_xaxis()   # 앞에서 본 모습 (왼쪽 = +y)
-    fig.suptitle('two_real 부품 배치 — 검정 원 = 몸통 Ø56, 초록 원 = 배관 내경 Ø100.8, 회색 = 바퀴 모듈 공간', fontsize=11)
+    fig.suptitle(f'{model} 부품 배치 — 검정 원 = 몸통 Ø56, 초록 원 = 배관 내경 Ø100.8, 회색 = 바퀴 모듈 공간', fontsize=11)
     fig.tight_layout()
     fig.savefig(path, dpi=110)
 
@@ -277,13 +282,13 @@ def main():
     total = sum(r['mass'] for r in report.values())
     print(f'\n총 질량 {total:.0f} g  ->  {"배치 OK" if ok_all else "배치 문제 있음 (빨강으로 표시)"}')
     if a.layout == 'layout.yaml':
-        write_xacro(layout, report, rp, os.path.join(mdir, 'components.urdf.xacro'))
+        write_xacro(layout, report, os.path.join(mdir, 'components.urdf.xacro'))
     if a.plot:
-        plot(layout, report, rp, a.plot)
+        plot(layout, report, rp, a.plot, a.model)
         print(f'배치도: {a.plot}')
     if a.apply:
         apply_params(os.path.join(mdir, 'robot.yaml'), report, rp)
-        print('robot.yaml 갱신 (seg_len, seg_mass, seg_com, spawn_x)')
+        print('robot.yaml 갱신 (seg_len, seg_mass, seg_com, spawn_x, body_len)')
 
 
 if __name__ == '__main__':

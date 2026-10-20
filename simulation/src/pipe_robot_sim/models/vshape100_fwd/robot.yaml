@@ -1,0 +1,26 @@
+# V자형 100mm 로봇 전륜 구동판 (모양은 vshape100). 앞 옴니휠 2개만 구동, IMU 보조 제어 켬
+/**:
+  ros__parameters:
+    wheel_joints: [front_left_omni_joint, front_right_omni_joint]
+    wheel_radius: 0.030
+    encoder_cpr: 2800             # 추정
+    motor_stall_torque: 0.3       # 추정 (vshape100 과 같음)
+    motor_no_load_speed: 10.0
+    supply_voltage: 12.0
+    rated_voltage: 12.0
+    # 좌우 속도차: +1 = 왼쪽으로 돌 때 빨라지는 쪽(오른쪽 바퀴). 간격 = 좌우 옴니휠 중심 간격 Wo
+    wheel_sides: [-1.0, 1.0]
+    track_separation: 0.066
+    roll_joints: [roll_wheel_joint]
+    # IMU 보조 제어 (imu_assist 노드)
+    imu_assist: true
+    roll_target_deg: 0.0          # 0 = 구형 바퀴가 위, V 평면이 수직
+    roll_kp: 1.0                  # [N·m/rad] 구형 바퀴 토크
+    roll_kd: 0.02                 # [N·m·s/rad]
+    roll_max_torque: 0.3          # 굴림 모터 토크 한계, 추정 (xacro roll_damping 과 같은 모터)
+    roll_sign: -1.0               # 토크 방향: 바퀴에 + 토크를 주면 몸통 롤이 - 로 감 (2026-10-20 시험)
+    steer_gain: 1.0               # 0 이면 좌우 속도차 끔
+    spawn_x: 0.13
+    body_len: 0.105
+    tof: false
+    bench_spines: [base_link, link2]

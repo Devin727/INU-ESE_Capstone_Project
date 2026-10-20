@@ -1,0 +1,184 @@
+<?xml version="1.0"?>
+<!-- 모델 공통 매크로: 관성, 옴니휠(롤러), 시뮬 플러그인 (docs/02 규약)
+     단위 m, kg, rad. 함수는 sin, cos, asin, atan2, sqrt, radians, pi 만 씀 (VS Code URDF Visualizer와 xacro 둘 다 지원) -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ===== 관성 (아주 작은 값은 1e-8을 더해 0이 되지 않게) ===== -->
+  <xacro:macro name="inertial_box" params="m x y z xyz:='0 0 0' rpy:='0 0 0'">
+    <inertial>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+      <mass value="${m}"/>
+      <inertia ixx="${m*(y*y+z*z)/12 + 1e-8}" ixy="0" ixz="0" iyy="${m*(x*x+z*z)/12 + 1e-8}" iyz="0"
+               izz="${m*(x*x+y*y)/12 + 1e-8}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- 원기둥: 축은 origin 회전 후의 z -->
+  <xacro:macro name="inertial_cyl" params="m r l xyz:='0 0 0' rpy:='0 0 0'">
+    <inertial>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+      <mass value="${m}"/>
+      <inertia ixx="${m*(3*r*r+l*l)/12 + 1e-8}" ixy="0" ixz="0" iyy="${m*(3*r*r+l*l)/12 + 1e-8}" iyz="0"
+               izz="${m*r*r/2 + 1e-8}"/>
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="inertial_sphere" params="m r xyz:='0 0 0'">
+    <inertial>
+      <origin xyz="${xyz}" rpy="0 0 0"/>
+      <mass value="${m}"/>
+      <inertia ixx="${0.4*m*r*r + 1e-8}" ixy="0" ixz="0" iyy="${0.4*m*r*r + 1e-8}" iyz="0" izz="${0.4*m*r*r + 1e-8}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- ===== 옴니휠 =====
+       허브(구동, 축 y) + 롤러 2줄 x n개 (각 롤러는 바퀴 둘레 접선 방향으로 자유 회전).
+       롤러 충돌체는 구(반경 rr): 바깥 끝이 바퀴 반경 R과 같음. 두 줄은 반 칸씩 엇갈림.
+       구 롤러는 실제 통 모양 롤러와 달리 둘레가 울퉁불퉁함: 롤러 사이에서 벽에 닿는 각이 크면(약 30° 이상)
+       바퀴를 돌릴수록 롤러가 벽에 박혀 바퀴가 멈춤 (docs/06). 그래서 row = 0 (한 평면) + 줄당 n = 8 (합 16개)로
+       롤러 사이 각을 약 11°로 줄여 씀. 같은 링크끼리는 충돌하지 않으므로 롤러끼리 겹쳐도 됨.
+       name: 허브 링크 이름, parent: 붙일 링크, xyz: parent 좌표의 바퀴 중심
+       row: 두 롤러 줄의 중심 간격 절반 [m] (바퀴 폭 방향 y), mu: 롤러 마찰계수
+       damping: 허브 관절 감쇠 = 모터 스톨 토크 / 무부하 속도 (역기전력)
+       roller_mass: 4 g (링크와 질량 차이를 너무 크게 두지 않음) -->
+  <xacro:macro name="omni_wheel" params="name parent xyz R width n rr row hub_mass roller_mass mu damping">
+    <joint name="${name}_joint" type="continuous">
+      <parent link="${parent}"/>
+      <child link="${name}"/>
+      <origin xyz="${xyz}" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <dynamics damping="${damping}" friction="0"/>
+    </joint>
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="${R - 1.6*rr}" length="${width*0.8}"/></geometry>
+        <material name="omni_hub"><color rgba="0.75 0.75 0.78 1"/></material>
+      </visual>
+      <xacro:inertial_cyl m="${hub_mass}" r="${R - rr}" l="${width}" rpy="${pi/2} 0 0"/>
+    </link>
+    <xacro:omni_rollers hub="${name}" n="${n}" i="0" R="${R}" rr="${rr}" y="${-row}" phase="0"
+                        m="${roller_mass}" mu="${mu}" tag="a"/>
+    <xacro:omni_rollers hub="${name}" n="${n}" i="0" R="${R}" rr="${rr}" y="${row}" phase="${pi/n}"
+                        m="${roller_mass}" mu="${mu}" tag="b"/>
+  </xacro:macro>
+
+  <!-- 롤러 한 줄 (재귀). 롤러 중심은 허브 중심에서 R-rr, 축은 접선 (-sin, 0, cos) -->
+  <xacro:macro name="omni_rollers" params="hub n i R rr y phase m mu tag">
+    <xacro:if value="${i &lt; n}">
+      <joint name="${hub}_${tag}${i}_joint" type="continuous">
+        <parent link="${hub}"/>
+        <child link="${hub}_${tag}${i}"/>
+        <origin xyz="${(R-rr)*cos(2*pi*i/n + phase)} ${y} ${(R-rr)*sin(2*pi*i/n + phase)}" rpy="0 0 0"/>
+        <axis xyz="${-sin(2*pi*i/n + phase)} 0 ${cos(2*pi*i/n + phase)}"/>
+        <dynamics damping="0.00001" friction="0"/>
+      </joint>
+      <link name="${hub}_${tag}${i}">
+        <visual>
+          <origin xyz="0 0 0" rpy="0 ${-(2*pi*i/n + phase)} 0"/>
+          <geometry><cylinder radius="${rr}" length="${1.5*rr}"/></geometry>
+          <material name="omni_roller"><color rgba="0.25 0.25 0.25 1"/></material>
+        </visual>
+        <collision>
+          <geometry><sphere radius="${rr}"/></geometry>
+        </collision>
+        <xacro:inertial_sphere m="${m}" r="${rr}"/>
+      </link>
+      <gazebo reference="${hub}_${tag}${i}">
+        <mu1>${mu}</mu1>
+        <mu2>${mu}</mu2>
+      </gazebo>
+      <xacro:omni_rollers hub="${hub}" n="${n}" i="${i+1}" R="${R}" rr="${rr}" y="${y}" phase="${phase}"
+                          m="${m}" mu="${mu}" tag="${tag}"/>
+    </xacro:if>
+  </xacro:macro>
+
+  <!-- ===== 시뮬 플러그인 (docs/02 규약) ===== -->
+
+  <!-- 관절 상태, 정답 위치, IMU (imu_link 를 parent 에 고정) -->
+  <xacro:macro name="sim_common" params="imu_parent imu_xyz:='0 0 0'">
+    <joint name="imu_joint" type="fixed">
+      <parent link="${imu_parent}"/>
+      <child link="imu_link"/>
+      <origin xyz="${imu_xyz}" rpy="0 0 0"/>
+    </joint>
+    <link name="imu_link"/>
+    <gazebo reference="imu_link">
+      <sensor name="imu" type="imu">
+        <always_on>1</always_on>
+        <update_rate>200</update_rate>
+        <topic>/imu</topic>
+        <imu>
+          <!-- MPU6050 수준 노이즈 (docs/08) -->
+          <angular_velocity>
+            <x><noise type="gaussian"><mean>0</mean><stddev>0.0012</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0</mean><stddev>0.0012</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0</mean><stddev>0.0012</stddev></noise></z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x><noise type="gaussian"><mean>0</mean><stddev>0.055</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0</mean><stddev>0.055</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0</mean><stddev>0.055</stddev></noise></z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+    </gazebo>
+    <gazebo>
+      <plugin filename="ignition-gazebo-joint-state-publisher-system"
+              name="ignition::gazebo::systems::JointStatePublisher">
+        <topic>/joint_states</topic>
+      </plugin>
+      <plugin filename="ignition-gazebo-odometry-publisher-system"
+              name="ignition::gazebo::systems::OdometryPublisher">
+        <odom_frame>world</odom_frame>
+        <robot_base_frame>base_link</robot_base_frame>
+        <odom_topic>/ground_truth/odom</odom_topic>
+        <odom_publish_frequency>100</odom_publish_frequency>
+        <dimensions>3</dimensions>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- 토크 입력 관절 (바퀴 모터 등): /model/pipe_robot/joint/<joint>/cmd_force -->
+  <xacro:macro name="joint_force" params="joint">
+    <gazebo>
+      <plugin filename="ignition-gazebo-apply-joint-force-system"
+              name="ignition::gazebo::systems::ApplyJointForce">
+        <joint_name>${joint}</joint_name>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- 각도 명령 관절 (서보): /servo/<joint> [rad] -->
+  <xacro:macro name="joint_servo" params="joint p d tmax">
+    <gazebo>
+      <plugin filename="ignition-gazebo-joint-position-controller-system"
+              name="ignition::gazebo::systems::JointPositionController">
+        <joint_name>${joint}</joint_name>
+        <topic>/servo/${joint}</topic>
+        <p_gain>${p}</p_gain>
+        <i_gain>0</i_gain>
+        <d_gain>${d}</d_gain>
+        <cmd_max>${tmax}</cmd_max>
+        <cmd_min>${-tmax}</cmd_min>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- 토션 스프링 관절: 토크 = -k (q - ref) -->
+  <xacro:macro name="joint_spring" params="joint k ref">
+    <gazebo reference="${joint}">
+      <springReference>${ref}</springReference>
+      <springStiffness>${k}</springStiffness>
+      <implicitSpringDamper>true</implicitSpringDamper>
+    </gazebo>
+  </xacro:macro>
+
+  <xacro:macro name="friction" params="link mu">
+    <gazebo reference="${link}">
+      <mu1>${mu}</mu1>
+      <mu2>${mu}</mu2>
+    </gazebo>
+  </xacro:macro>
+
+</robot>

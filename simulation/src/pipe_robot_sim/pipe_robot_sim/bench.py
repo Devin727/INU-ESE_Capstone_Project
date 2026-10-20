@@ -1,6 +1,6 @@
 """모델 x 배관 일괄 주행 비교 (화면 없이) — 실물 제작 기준 평가 포함.
 
-ros2 run pipe_robot_sim bench --models three_segment pirate_v --courses straight elbow90 \
+ros2 run pipe_robot_sim bench --models <모델1> <모델2> --courses straight elbow90 \
     --fittings "" dv_ll90 -o result.csv
 
 각 조합마다 sim.launch.py 를 헤드리스로 띄우고 /cmd_vel 로 일정 속도 전진.
@@ -37,7 +37,7 @@ from std_msgs.msg import Int64MultiArray, String
 from tf2_msgs.msg import TFMessage
 
 from pipe_robot_sim.generate_world import default_courses_file, overrides
-from pipe_robot_sim.joint_follow import quat_to_rot
+from pipe_robot_sim.odometry import quat_to_rot
 from pipe_robot_sim.pipe_geometry import build_course, load_config
 
 FIT90 = {'dv90', 'dv_ll90', 'ts90'}
@@ -148,6 +148,9 @@ def run_one(node, model, course, fitting, speed, cfg, log_dir):
         args += [f'fitting90:={fitting}'] if fitting in FIT90 else [f'fitting45:={fitting}']
     log = open(os.path.join(log_dir, f'{model}_{course}_{fitting or "base"}.log'), 'w')
     kill_marked()                       # 이전 실행의 찌꺼기 제거 후 시작
+    t_drain = time.time()               # 이전 시뮬이 보내 둔 메시지를 비움 (안 비우면 새 실행 첫 값으로 섞임)
+    while time.time() - t_drain < 1.0:
+        rclpy.spin_once(node, timeout_sec=0.05)
     _RUN[0] += 1
     env = dict(os.environ, PIPE_BENCH=str(_RUN[0]))
     proc = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, start_new_session=True, env=env)
@@ -155,14 +158,27 @@ def run_one(node, model, course, fitting, speed, cfg, log_dir):
     res = dict(model=model, course=course, fitting=fitting or '-', result='ERROR', real_ok='', time_s='',
                progress='', align_max='', align_where='', roll_max='', sat_s='', sat_joint='', slip_pct='',
                stall_s='', est_err_mm='', note='')
+
+    def fresh():
+        """새 시뮬의 정답 위치인가: 시뮬 시각은 실행마다 0부터 다시 시작하므로 시각이 작아야 함.
+        노드 시계(/clock)도 새 시뮬 쪽으로 넘어와 있어야 t0 가 맞음."""
+        if node.gt is None or 'pipe_robot' not in node.poses:
+            return False
+        st = node.gt.header.stamp.sec + node.gt.header.stamp.nanosec * 1e-9
+        return st < 10.0 and node.now() < st + 2.0
+
     try:
         t_wall = time.time()
-        while (node.gt is None or 'pipe_robot' not in node.poses) and time.time() - t_wall < 40:
+        while not fresh() and time.time() - t_wall < 40:
             rclpy.spin_once(node, timeout_sec=0.2)
+            if node.gt is not None and not fresh():
+                node.gt = None          # 이전 시뮬 값이면 버리고 다시 기다림
         if node.gt is None:
             res['note'] = '시작 실패'
             return res
-        time.sleep(1.0)
+        t_settle = time.time()          # 1초 안정화 (그동안 메시지는 계속 받음)
+        while time.time() - t_settle < 1.0:
+            rclpy.spin_once(node, timeout_sec=0.05)
         t0 = node.now()
         t_prev = t0
         limit = seg[-1] / speed * 2.5 + 20
@@ -267,7 +283,7 @@ def run_one(node, model, course, fitting, speed, cfg, log_dir):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--models', nargs='+', default=['three_wheel', 'three_segment', 'pirate_v', 'tracked'])
+    ap.add_argument('--models', nargs='+', required=True, help='models/ 아래 폴더 이름')
     ap.add_argument('--courses', nargs='+', default=['straight', 'elbow45', 'elbow90', 'demo'])
     ap.add_argument('--fittings', nargs='+', default=[''], help='"" = 코스 기본, 예: dv_ll90 ts90')
     ap.add_argument('--speed', type=float, default=0.06)
@@ -286,8 +302,11 @@ def main():
     rclpy.init()
     node = Runner()
     rows = []
-    combos = [(m, c, f) for m in a.models for c in a.courses for f in a.fittings
-              if not f or (c in ('elbow90', 'demo') and f in FIT90) or (c in ('elbow45', 'demo') and f not in FIT90)]
+    def has_angle(course, fitting):   # 교체할 엘보와 같은 각도의 엘보가 코스에 있어야 의미가 있음
+        ang = cfg['fittings'][fitting]['angle']
+        return any(cfg['fittings'][seg['fitting']]['angle'] == ang for seg in cfg['courses'][course] if 'fitting' in seg)
+
+    combos = [(m, c, f) for m in a.models for c in a.courses for f in a.fittings if not f or has_angle(c, f)]
     for i, (m, c, f) in enumerate(combos, 1):
         r = run_one(node, m, c, f, a.speed, cfg, log_dir)
         if r['result'] == 'ERROR' or (r['result'] == 'PASS' and r['slip_pct'] == ''):

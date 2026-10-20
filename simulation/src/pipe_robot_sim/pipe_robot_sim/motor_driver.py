@@ -10,6 +10,11 @@ pub  /motor/<joint>/torque (std_msgs/Float64, 브리지 -> Gazebo)
      /motor/duty, /motor/wheel_speed (std_msgs/Float64MultiArray, 디버그)
 drive_mode: speed_pid (바퀴마다 속도 PID) | open_loop (duty = 목표/최고속도, 피드백 없음)
             | diff (평균 속도만 PID, 모든 바퀴 같은 토크 = 전자식 차동)
+/wheel_dirs (std_msgs/Float64MultiArray, wheel_joints 순서): 바퀴별 목표 속도 배수 (speed_pid, open_loop).
+            1 = 그대로, -1 = 반대로, 0.5 = 절반, 0 = 제동 (속도 0 을 PID 로 붙잡음), NaN = 토크 0 (자유 회전).
+            안 보내면 모두 1.
+            (0 을 토크 0 으로 두면 바퀴가 자유롭게 굴러, 관절이 V 를 접는 힘에 로봇이 밀려남)
+            (뱀형처럼 자세에 따라 바퀴가 닿는 벽이 바뀌는 모델에서 제어 노드가 보냄)
 """
 import math
 
@@ -47,10 +52,12 @@ class MotorDriver(Node):
         self.speed = [0.0] * n
         self.integ = [0.0] * n
         self.prev_err = [0.0] * n
+        self.dirs = [1.0] * n
 
         self.create_subscription(Twist, 'cmd_vel', self.on_cmd, 10)
         self.create_subscription(Float64, 'steer_cmd', lambda m: setattr(self, 'steer_extra', m.data), 10)
         self.create_subscription(Int64MultiArray, 'wheel_encoders', self.on_enc, 10)
+        self.create_subscription(Float64MultiArray, 'wheel_dirs', self.on_dirs, 10)
         self.torque_pubs = [self.create_publisher(Float64, f'motor/{j}/torque', 10) for j in self.joints]
         self.duty_pub = self.create_publisher(Float64MultiArray, 'motor/duty', 10)
         self.speed_pub = self.create_publisher(Float64MultiArray, 'motor/wheel_speed', 10)
@@ -65,6 +72,10 @@ class MotorDriver(Node):
 
     def on_enc(self, msg):
         self.counts = list(msg.data)
+
+    def on_dirs(self, msg):
+        if len(msg.data) == len(self.joints):
+            self.dirs = list(msg.data)
 
     def step(self):
         dt = 1.0 / self.rate
@@ -99,8 +110,13 @@ class MotorDriver(Node):
             self.speed_pub.publish(Float64MultiArray(data=self.speed))
             return
         for i in range(len(self.joints)):
+            if math.isnan(self.dirs[i]):               # 자유 회전: 토크 0
+                self.integ[i] = 0.0
+                duties.append(0.0)
+                self.torque_pubs[i].publish(Float64(data=0.0))
+                continue
             side = self.sides[i] if i < len(self.sides) else 0.0
-            tgt = target
+            tgt = target * self.dirs[i]                # dirs 0 -> 목표 속도 0 (제동)
             if target != 0.0 and side:
                 tgt += side * (self.steer + self.steer_extra) * self.sep / 2 / self.r
             ff = tgt / w_max

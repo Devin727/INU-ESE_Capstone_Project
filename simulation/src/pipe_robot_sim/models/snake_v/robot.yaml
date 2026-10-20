@@ -1,0 +1,26 @@
+# 뱀형 V자 (PIRATE 방식). 모양은 snake_v.urdf.xacro, 관절 제어는 snake_gait 노드
+# 치수·모터·서보 값은 모두 추정 (docs/08)
+/**:
+  ros__parameters:
+    wheel_joints: [w1_l_joint, w1_r_joint, w2_l_joint, w2_r_joint, w3_l_joint, w3_r_joint,
+                   w4_l_joint, w4_r_joint, w5_l_joint, w5_r_joint, w6_l_joint, w6_r_joint]
+    wheel_radius: 0.015
+    encoder_cpr: 2800             # 추정 (N20 1:100)
+    motor_stall_torque: 0.147
+    motor_no_load_speed: 16.8
+    supply_voltage: 7.4
+    rated_voltage: 6.0
+    servo_joints: [j1_joint, j2_joint, j3_joint, j4_joint, j5_joint, j6_joint]
+    servo_modes: [active, active, active, active, active, active]
+    # snake_gait 노드
+    snake_gait: true
+    gait_mode: oracle             # clamp = 두 V 누름만, oracle = 엘보 통과 순서 (배관 모양을 아는 상한 확인용)
+    arm_len: 0.085                # xacro L 과 같게
+    wheel_y: 0.016                # xacro yw 와 같게
+    clamp_extra_deg: 10.0         # 꼭짓점 관절을 더 굽히라고 명령하는 각 (토크 한계로 누름)
+    spawn_x: 0.26                 # 일자 자세에서 뒤 바퀴 끝이 입구 안쪽에 들어가게
+    spawn_dz: -0.025              # 로봇 아래쪽 바퀴가 벽 가까이에서 시작 (로봇 기준)
+    spawn_roll_deg: 0.0           # 일자 자세로 눕혀 띄우면 V를 만들기 전에 굴러 버림 -> V 수직으로 시작하고 축 회전으로 맞춤
+    body_len: 0.05
+    tof: false
+    bench_spines: [base_link]

@@ -1,0 +1,19 @@
+# AIRo-7.1 (arXiv 2411.03660). 모양은 airo71.urdf.xacro
+# 링크 치수·모터·엔코더 값 대부분 추정 (docs/08)
+/**:
+  ros__parameters:
+    wheel_joints: [j1_left_omni_joint, j1_right_omni_joint, j2_left_omni_joint, j2_right_omni_joint,
+                   j3_left_omni_joint, j3_right_omni_joint]
+    wheel_radius: 0.021           # 옴니휠 반경, 추정
+    encoder_cpr: 2800             # 추정
+    motor_stall_torque: 1.0       # 바퀴당 [N·m], 추정 (xacro wheel_damping 과 같게)
+    motor_no_load_speed: 4.2      # [rad/s] = 0.088 m/s (논문 최고 속도) / 0.021
+    supply_voltage: 24.0          # 논문 DC 24 V
+    rated_voltage: 24.0
+    servo_joints: [j2_joint]      # 능동 가운데 관절 (/servo/j2_joint, rad)
+    servo_modes: [active]
+    roll_joints: [front_roll_joint, rear_roll_joint]   # 끝 굴림 바퀴 (토크 입력, 제어 노드는 아직 없음)
+    spawn_x: 0.44                 # 뒤 바퀴 끝(base_link 에서 -0.419 m)이 입구 안쪽에 들어가게
+    body_len: 0.13
+    tof: false
+    bench_spines: ['base_link:link4']   # 지그재그라 마디 하나씩은 늘 기울어 있음 -> 앞뒤 끝을 이은 방향으로 정렬 측정

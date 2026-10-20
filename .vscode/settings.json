@@ -1,0 +1,6 @@
+{
+  // URDF Visualizer (morningfrog.urdf-visualizer): xacro 안의 $(find pipe_robot_sim) 경로
+  "urdf-visualizer.packages": {
+    "pipe_robot_sim": "simulation/src/pipe_robot_sim"
+  }
+}
