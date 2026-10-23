@@ -5,6 +5,7 @@
 세그먼트마다 내경을 따로 두므로 파이프(VG1)와 엘보 몸통 내경 차이로 생기는 턱이 그대로 재현된다.
 """
 import math
+import os
 from dataclasses import dataclass
 
 import numpy as np
@@ -193,7 +194,7 @@ def write_collision_stl(builder, path):
     """충돌용: 배관 내벽면만 메시 하나로 (법선은 배관 안쪽).
     박스 수백 개를 충돌체로 두면 DART가 매 스텝 박스끼리도 검사해서 실시간 대비 0.2배까지 느려짐."""
     import struct
-    pts = inner_triangles(builder, cutaway=False)
+    pts = inner_triangles(builder, cutaway=False, max_len=0.02)
     with open(path, 'wb') as f:
         f.write(b'pipe_collision'.ljust(80, b' '))
         f.write(struct.pack('<I', len(pts) // 3))
@@ -244,8 +245,8 @@ def world_sdf(builder, world_name='pipe_world', cutaway=True, visual_mesh=None, 
 <sdf version="1.8">
   <world name="{world_name}">
     <physics name="1ms" type="ignored">
-      <max_step_size>0.001</max_step_size>
-      <real_time_factor>1.0</real_time_factor>
+      <max_step_size>{os.environ.get('PIPE_STEP', '0.001')}</max_step_size>
+      <real_time_factor>1.0</real_time_factor>{os.environ.get('PIPE_PHYSICS_EXTRA', '')}
     </physics>
     <plugin filename="ignition-gazebo-physics-system" name="ignition::gazebo::systems::Physics"/>
     <plugin filename="ignition-gazebo-user-commands-system" name="ignition::gazebo::systems::UserCommands"/>
@@ -278,17 +279,23 @@ def world_sdf(builder, world_name='pipe_world', cutaway=True, visual_mesh=None, 
 '''
 
 
-def inner_triangles(builder, cutaway=True):
-    """RViz TRIANGLE_LIST용: 각 박스의 안쪽 면(직사각형 = 삼각형 2개)."""
+def inner_triangles(builder, cutaway=True, max_len=None):
+    """RViz TRIANGLE_LIST용: 각 박스의 안쪽 면(직사각형 = 삼각형 2개).
+    max_len: 진행 방향으로 이 길이마다 잘라 삼각형을 나눔 (충돌용). 직관 2 m 를 삼각형 2개로 두면 길이 2 m·폭 13 mm 의
+    가는 삼각형이 되어, 바퀴가 긴 대각선 근처를 지날 때 DART 접촉이 잠겨 로봇이 그 자리에서 굳었음 (airo71, 2026-10-22)"""
     pts = []
     for s in builder.staves:
         if cutaway and s.top:
             continue
         x, y, z = s.rot[:, 0], s.rot[:, 1], s.rot[:, 2]
         c = s.center - z * s.size[2] / 2
-        hx, hy = x * s.size[0] / 2, y * s.size[1] / 2
-        p = [c - hx - hy, c + hx - hy, c + hx + hy, c - hx + hy]
-        pts += [p[0], p[1], p[2], p[0], p[2], p[3]]
+        hy = y * s.size[1] / 2
+        n = max(1, int(math.ceil(s.size[0] / max_len))) if max_len else 1
+        for k in range(n):
+            a0 = c + x * s.size[0] * (k / n - 0.5)
+            a1 = c + x * s.size[0] * ((k + 1) / n - 0.5)
+            p = [a0 - hy, a1 - hy, a1 + hy, a0 + hy]
+            pts += [p[0], p[1], p[2], p[0], p[2], p[3]]
     return pts
 
 

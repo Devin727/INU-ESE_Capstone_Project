@@ -41,12 +41,13 @@
        row: 두 롤러 줄의 중심 간격 절반 [m] (바퀴 폭 방향 y), mu: 롤러 마찰계수
        damping: 허브 관절 감쇠 = 모터 스톨 토크 / 무부하 속도 (역기전력)
        roller_mass: 4 g (링크와 질량 차이를 너무 크게 두지 않음) -->
-  <xacro:macro name="omni_wheel" params="name parent xyz R width n rr row hub_mass roller_mass mu damping">
+  <!-- spin = -1: 위 벽에 닿는 바퀴 (축을 뒤집어 같은 + 속도 명령에 앞으로 감) -->
+  <xacro:macro name="omni_wheel" params="name parent xyz R width n rr row hub_mass roller_mass mu damping spin:=1">
     <joint name="${name}_joint" type="continuous">
       <parent link="${parent}"/>
       <child link="${name}"/>
       <origin xyz="${xyz}" rpy="0 0 0"/>
-      <axis xyz="0 1 0"/>
+      <axis xyz="0 ${spin} 0"/>
       <dynamics damping="${damping}" friction="0"/>
     </joint>
     <link name="${name}">

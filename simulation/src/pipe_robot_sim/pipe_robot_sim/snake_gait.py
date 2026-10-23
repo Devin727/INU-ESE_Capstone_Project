@@ -44,6 +44,7 @@ V 팔 각도 θ: 아래 바퀴와 위 바퀴 중심의 높이 차 = 팔 길이 x
 
 sub /joint_states, /gz_poses (oracle)
 pub /servo/<관절> (rad), /wheel_dirs (바퀴별 속도 배수, motor_driver), /snake_gait/state (상태 이름)
+driven_wheels: 모터가 있는 바퀴 쌍 (기본 전부). 없는 쌍은 늘 NaN (자유 회전)
 """
 import math
 
@@ -82,6 +83,9 @@ class SnakeGait(Node):
         self.pass_speed = d('pass_speed_ratio', 0.6).value
         self.pre = d('release_before', 0.08).value        # 머리가 엘보 곡선 시작 전 이 거리에서 앞 V 풂 [m]
         self.align_pre = d('align_before', 0.25).value    # 이 거리에서 몸 전체 축 회전 [m]
+        self.rot_timeout = d('rot_timeout', 6.0).value
+        self.rot_retries = d('rot_retries', 3).value       # 축 회전 최대 횟수 (덜 돌면 다시)
+        self.rot_tries = {}     # 축 회전 단계 최대 시간 [s] (아래 엘보 180° 는 오래 걸림)
         self.aligned_i = -1                               # 축 회전을 마친 엘보 번호
         self.after = d('clamp_after', 0.02).value         # 엘보 끝을 이만큼 지나면 다시 누름 [m]
         h = math.sqrt((rp - rw) ** 2 - yw ** 2)          # 바퀴 중심이 벽에 닿는 높이
@@ -89,6 +93,7 @@ class SnakeGait(Node):
         self.Lm = d('mid_len', 0.10).value
         self.outer, self.outer_k = None, None            # 바깥 벽 선 (엘보마다)
         self.rate = math.radians(d('rate_limit_deg', 60.0).value)
+        self.driven = set(d('driven_wheels', WHEELS).value)   # 모터가 있는 바퀴 쌍. 나머지는 늘 자유 회전
         self.cmd = {}                                     # 마지막으로 보낸 관절 목표 (변화 속도 제한용)
         self.theta = math.asin(min(1.0, 2 * h / self.L))
 
@@ -257,7 +262,8 @@ class SnakeGait(Node):
                 f'[{self.state}] 명령 ' + ' '.join(f'{j[:2]}={math.degrees(v):.0f}' for j, v in sorted(targets.items()))
                 + ' | 실제 ' + ' '.join(f'{j[:2]}={math.degrees(self.q.get(j, 0)):.0f}' for j in sorted(targets)),
                 throttle_duration_sec=2.0)
-        self.dirs_pub.publish(Float64MultiArray(data=[float(dirs[w] * speed) for w in WHEELS for _ in (0, 1)]))
+        data = [float(dirs[w] * speed) if w in self.driven else math.nan for w in WHEELS for _ in (0, 1)]
+        self.dirs_pub.publish(Float64MultiArray(data=data))
         self.state_pub.publish(String(data=self.state))
 
     def go(self, state):
@@ -312,8 +318,11 @@ class SnakeGait(Node):
                 # 왼쪽 -90°, 오른쪽 +90°, 위 0°, 아래 180°
                 x, y, a = Rb[:, 0], Rb[:, 1], el['axis']
                 self.phi = math.atan2(float(np.dot(np.cross(y, -a), x)), float(np.dot(y, -a)))
-                self.aligned_i = self.elbow_i
-                if abs(self.phi) > math.radians(10):
+                # 회전이 덜 됐으면 (V 가 미끄러져 풀림) 다시 돌림, 최대 rot_retries 번 (2026-10-22)
+                if self.rot_tries.get(self.elbow_i, 0) >= self.rot_retries or abs(self.phi) <= math.radians(15):
+                    self.aligned_i = self.elbow_i
+                if abs(self.phi) > math.radians(10) and self.aligned_i != self.elbow_i:
+                    self.rot_tries[self.elbow_i] = self.rot_tries.get(self.elbow_i, 0) + 1
                     # 뒤 V가 고정이면 J3 +Δ -> 앞부분 -Δ 회전
                     self.q3_goal = q3 - self.phi
                     self.get_logger().info(f"{el['name']}: 몸 전체 {math.degrees(self.phi):.0f}° 회전 "
@@ -329,7 +338,7 @@ class SnakeGait(Node):
         elif self.state == 'A_ROT_F':
             free = {j: self.soft_to(j, 0.0) for j in ('j4_joint', 'j5_joint', 'j6_joint')}
             self.publish({**self.clamp_rear(), 'j3_joint': self.q3_goal, **free}, stop)
-            if abs(q3 - self.q3_goal) < math.radians(3) or dt > 6:
+            if abs(q3 - self.q3_goal) < math.radians(8) or dt > self.rot_timeout:
                 self.go('A_CLAMP_F')
         elif self.state == 'A_CLAMP_F':
             self.publish({**self.clamp_rear(), 'j3_joint': self.q3_goal, **self.clamp_front()}, grip_front)
@@ -344,7 +353,7 @@ class SnakeGait(Node):
         elif self.state == 'A_ROT_R':
             free = {j: self.soft_to(j, 0.0) for j in ('j1_joint', 'j2_joint')}
             self.publish({**free, 'j3_joint': self.q3_goal, **self.clamp_front()}, stop)
-            if abs(q3 - self.q3_goal) < math.radians(3) or dt > 6:
+            if abs(q3 - self.q3_goal) < math.radians(8) or dt > self.rot_timeout:
                 self.go('A_CLAMP_R')
         elif self.state == 'A_CLAMP_R':
             self.publish({**self.clamp_rear(), 'j3_joint': self.q3_goal, **self.clamp_front()}, grip_rear)

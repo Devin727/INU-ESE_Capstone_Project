@@ -25,19 +25,25 @@
   <xacro:property name="yw" value="0.016"/>     <!-- 바퀴 중심의 좌우 위치 (±) -->
 
   <!-- 질량 (링크 안 서보 포함, 추정). 총 약 0.75 kg -->
-  <xacro:property name="m_arm" value="0.07"/>   <!-- V 팔 4개 -->
-  <xacro:property name="m_mid" value="0.08"/>   <!-- 가운데 링크 반쪽 2개 (배터리·보드) -->
-  <xacro:property name="m_head" value="0.06"/>
+  <xacro:arg name="mass_scale" default="1.0"/>   <!-- 비교 시험용: 링크 질량 배율 -->
+  <xacro:property name="m_arm" value="${0.07*$(arg mass_scale)}"/>   <!-- V 팔 4개 -->
+  <xacro:property name="m_mid" value="${0.08*$(arg mass_scale)}"/>   <!-- 가운데 링크 반쪽 2개 (배터리·보드) -->
+  <xacro:property name="m_head" value="${0.06*$(arg mass_scale)}"/>
   <xacro:property name="m_wheel" value="0.012"/>
 
   <!-- 바퀴 모터: N20 1:100 추정 (스톨 0.147 N·m, 무부하 16.8 rad/s), 감쇠 = 스톨/무부하 -->
-  <xacro:property name="wheel_damping" value="${0.147/16.8}"/>
-  <xacro:property name="mu_wheel" value="0.8"/>   <!-- 고무 바퀴 ↔ PVC, 추정 -->
+  <xacro:arg name="motor_stall" default="0.147"/>   <!-- 비교 시험용: robot.yaml motor_stall_torque 와 같게 -->
+  <xacro:property name="wheel_damping" value="${$(arg motor_stall)/16.8}"/>
+  <xacro:arg name="mu_wheel" default="0.8"/>
+  <xacro:property name="mu_wheel" value="$(arg mu_wheel)"/>   <!-- 고무 바퀴 ↔ PVC, 추정 -->
 
   <!-- 관절 서보 (추정): 꼭짓점 J1, J5 = 누르는 관절, 나머지 = 자세 유지 -->
-  <xacro:property name="t_clamp" value="1.2"/>    <!-- J1, J5 토크 한계 [N·m] -->
-  <xacro:property name="t_hold" value="1.0"/>     <!-- J2, J4, J6 -->
-  <xacro:property name="t_roll" value="0.5"/>     <!-- J3 -->
+  <xacro:arg name="servo_p" default="2"/>   <!-- 서보 위치 게인 [N·m/rad] -->
+  <xacro:arg name="servo_scale" default="1.0"/>   <!-- 비교 시험용: 서보 토크 한계 배율 -->
+  <xacro:property name="t_clamp" value="${1.2*$(arg servo_scale)}"/>    <!-- J1, J5 토크 한계 [N·m] -->
+  <xacro:property name="t_hold" value="${1.0*$(arg servo_scale)}"/>     <!-- J2, J4, J6 -->
+  <xacro:arg name="roll_scale" default="1.0"/>
+  <xacro:property name="t_roll" value="${0.5*$(arg servo_scale)*$(arg roll_scale)}"/>     <!-- J3 -->
   <xacro:property name="jlim" value="${radians(120)}"/>
   <!-- 서보 감쇠는 관절 damping 으로 (DART 가 암시적으로 적분 -> 안정). 제어기 d_gain 은 0:
        d_gain 은 오차의 미분이라 목표가 바뀔 때마다(50 Hz) 한 스텝 동안 최대 토크로 차서 관절이 속도 한계(3 rad/s)로
@@ -146,13 +152,13 @@
 
   <!-- ===== 앞쪽: J4(w4) ─ f1 ─ J5(w5) ─ f2 ─ J6(w6) ─ 머리 ===== -->
   <xacro:wheel_pair name="w4" parent="base_link" x="${Lm/2}"/>
-  <xacro:pitch_joint name="j4_joint" parent="base_link" child="f1" x="${Lm/2}" tmax="${t_hold}" p="2"/>
+  <xacro:pitch_joint name="j4_joint" parent="base_link" child="f1" x="${Lm/2}" tmax="${t_hold}" p="$(arg servo_p)"/>
   <xacro:arm_link name="f1" dir="1" length="${L}" mass="${m_arm}"/>
   <xacro:wheel_pair name="w5" parent="f1" x="${L}" spin="-1"/>
-  <xacro:pitch_joint name="j5_joint" parent="f1" child="f2" x="${L}" tmax="${t_clamp}" p="2"/>
+  <xacro:pitch_joint name="j5_joint" parent="f1" child="f2" x="${L}" tmax="${t_clamp}" p="$(arg servo_p)"/>
   <xacro:arm_link name="f2" dir="1" length="${L}" mass="${m_arm}"/>
   <xacro:wheel_pair name="w6" parent="f2" x="${L}"/>
-  <xacro:pitch_joint name="j6_joint" parent="f2" child="head" x="${L}" tmax="${t_hold}" p="2"/>
+  <xacro:pitch_joint name="j6_joint" parent="f2" child="head" x="${L}" tmax="${t_hold}" p="$(arg servo_p)"/>
   <link name="head">
     <visual>
       <origin xyz="${Lh/2} 0 0" rpy="0 ${pi/2} 0"/>
@@ -173,10 +179,10 @@
 
   <!-- ===== 뒤쪽: J2(w3) ─ r2 ─ J1(w2) ─ r1 ─ w1 ===== -->
   <xacro:wheel_pair name="w3" parent="mid_rear" x="${-Lm/2}"/>
-  <xacro:pitch_joint name="j2_joint" parent="mid_rear" child="r2" x="${-Lm/2}" tmax="${t_hold}" p="2"/>
+  <xacro:pitch_joint name="j2_joint" parent="mid_rear" child="r2" x="${-Lm/2}" tmax="${t_hold}" p="$(arg servo_p)"/>
   <xacro:arm_link name="r2" dir="-1" length="${L}" mass="${m_arm}"/>
   <xacro:wheel_pair name="w2" parent="r2" x="${-L}" spin="-1"/>
-  <xacro:pitch_joint name="j1_joint" parent="r2" child="r1" x="${-L}" tmax="${t_clamp}" p="2"/>
+  <xacro:pitch_joint name="j1_joint" parent="r2" child="r1" x="${-L}" tmax="${t_clamp}" p="$(arg servo_p)"/>
   <xacro:arm_link name="r1" dir="-1" length="${L}" mass="${m_arm}"/>
   <xacro:wheel_pair name="w1" parent="r1" x="${-L}"/>
 

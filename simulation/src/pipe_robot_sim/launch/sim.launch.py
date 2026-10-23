@@ -82,6 +82,13 @@ def setup(context):
             raise RuntimeError(f"모델 '{model}' 없음 (models/{model}/robot.yaml). 있는 모델: {available_models() or '없음'}")
         with open(params_file, encoding='utf-8') as f:
             rp = yaml.safe_load(f)['/**']['ros__parameters']
+        # PIPE_PARAMS='k=v,k=v': robot.yaml 값 덮어쓰기 (비교 시험용, 임시 파일로 노드에 넘김)
+        extra = {k: yaml.safe_load(v) for k, v in (kv.split('=', 1) for kv in os.environ.get('PIPE_PARAMS', '').split(',') if '=' in kv)}
+        if extra:
+            rp.update(extra)
+            params_file = os.path.join(TMP, 'robot_params.yaml')
+            with open(params_file, 'w', encoding='utf-8') as f:
+                yaml.safe_dump({'/**': {'ros__parameters': rp}}, f, allow_unicode=True)
     else:
         actions.append(LogInfo(msg=f'model 인자가 비어 있어 배관만 띄웁니다. 있는 모델: {available_models() or "없음"}'))
 
@@ -99,7 +106,13 @@ def setup(context):
         smesh = os.path.join(TMP, f'{course}_pipe_sensor.stl')
         write_visual_stl(course_geo, smesh, cutaway=False)
     with open(world, 'w', encoding='utf-8') as f:
-        f.write(world_sdf(course_geo, visual_mesh=mesh, collision_mesh=cmesh, sensor_mesh=smesh))
+        # 물리 설정 (robot.yaml): dart_collision_detector (ode 기본 | bullet | fcl | dart), pipe_box_collision (배관 충돌체를
+        # 메시 대신 박스 조각으로, 느림). 환경변수 PIPE_PHYSICS_EXTRA / PIPE_BOX_COLLISION 로도 줄 수 있음 (시험용)
+        cd = os.environ.get('PIPE_DART_DETECTOR') or (rp or {}).get('dart_collision_detector')   # 환경변수가 우선 (시험용)
+        if cd:
+            os.environ['PIPE_PHYSICS_EXTRA'] = f'<dart><collision_detector>{cd}</collision_detector></dart>'
+        box_col = bool((rp or {}).get('pipe_box_collision') or os.environ.get('PIPE_BOX_COLLISION'))
+        f.write(world_sdf(course_geo, visual_mesh=mesh, collision_mesh=None if box_col else cmesh, sensor_mesh=smesh))
 
     sim = {'use_sim_time': True}
     gz_cmd = ['ign', 'gazebo', '-r', world] if gui else ['ign', 'gazebo', '-s', '-r', world]
@@ -127,6 +140,8 @@ def setup(context):
             'params_file': params_file,
             'pipe_inner_d': str(cfg['pipe']['inner_d']),
             'suspension': arg('suspension'),
+            # PIPE_XACRO_ARGS='k=v,k=v': 모델 xacro 인자 덮어쓰기 (비교 시험용)
+            **dict(kv.split('=', 1) for kv in os.environ.get('PIPE_XACRO_ARGS', '').split(',') if '=' in kv),
         }).toxml()
         bridge_file = os.path.join(TMP, 'bridge.yaml')
         with open(bridge_file, 'w', encoding='utf-8') as f:
@@ -156,8 +171,10 @@ def setup(context):
             actions.append(Node(package=PKG, executable='snake_gait', output='screen', parameters=[
                 params_file, sim, {'pipe_inner_d': cfg['pipe']['inner_d'], 'course': course, 'courses_file': courses_file,
                                    'fitting90': arg('fitting90'), 'fitting45': arg('fitting45')}]))
-        if rp.get('imu_assist'):   # IMU 보조 제어 (롤 유지, 좌우 속도차)
-            actions.append(Node(package=PKG, executable='imu_assist', output='screen', parameters=[params_file, sim]))
+        if rp.get('airo_ctrl'):   # AIRo-7.1 제어 (가운데 관절 누름, 굴림 바퀴로 굽힘 평면)
+            actions.append(Node(package=PKG, executable='airo_ctrl', output='screen', parameters=[
+                params_file, sim, {'course': course, 'courses_file': courses_file,
+                                   'fitting90': arg('fitting90'), 'fitting45': arg('fitting45')}]))
         if gui:   # Gazebo 카메라가 로봇을 비스듬히 위에서 따라감 (GUI 오른쪽 위 메뉴에서 해제 가능)
             svc = lambda srv, typ, req: ExecuteProcess(cmd=[  # noqa: E731
                 'ign', 'service', '-s', srv, '--reqtype', typ, '--reptype', 'ignition.msgs.Boolean',

@@ -1,19 +1,32 @@
-# AIRo-7.1 (arXiv 2411.03660). 모양은 airo71.urdf.xacro
-# 링크 치수·모터·엔코더 값 대부분 추정 (docs/08)
+# AIRo-7.1 (arXiv 2411.03660) 재현. 모양은 airo71.urdf.xacro, 제어는 airo_ctrl 노드
+# 링크 길이 일부·단면·스프링·질량 배분은 추정 (docs/08)
 /**:
   ros__parameters:
     wheel_joints: [j1_left_omni_joint, j1_right_omni_joint, j2_left_omni_joint, j2_right_omni_joint,
                    j3_left_omni_joint, j3_right_omni_joint]
-    wheel_radius: 0.021           # 옴니휠 반경, 추정
+    wheel_radius: 0.019           # Nexus 38 mm 옴니휠
     encoder_cpr: 2800             # 추정
-    motor_stall_torque: 1.0       # 바퀴당 [N·m], 추정 (xacro wheel_damping 과 같게)
-    motor_no_load_speed: 4.2      # [rad/s] = 0.088 m/s (논문 최고 속도) / 0.021
+    motor_stall_torque: 2.3       # 바퀴당 [N·m] (축 하나 4.6 N·m 를 둘로). xacro wheel_damping 과 같게
+    motor_no_load_speed: 4.6      # [rad/s] = 0.088 m/s (논문 최고 속도) / 0.019
     supply_voltage: 24.0          # 논문 DC 24 V
     rated_voltage: 24.0
     servo_joints: [j2_joint]      # 능동 가운데 관절 (/servo/j2_joint, rad)
     servo_modes: [active]
-    roll_joints: [front_roll_joint, rear_roll_joint]   # 끝 굴림 바퀴 (토크 입력, 제어 노드는 아직 없음)
-    spawn_x: 0.44                 # 뒤 바퀴 끝(base_link 에서 -0.419 m)이 입구 안쪽에 들어가게
-    body_len: 0.13
+    roll_joints: [front_roll_joint, rear_roll_joint]   # 끝 굴림 바퀴 (토크, airo_ctrl 이 보냄)
+    # airo_ctrl 노드
+    airo_ctrl: true
+    ctrl_mode: oracle             # oracle = 배관 모양을 알고 엘보 앞에서 굽힘 평면을 엘보 평면에 맞춤 (실물은 조종자/센서)
+    j2_target: 2.0                # [rad] 벽 너머로 줘서 토크 한계(1.32 N·m)로 누름
+    roll_kp: 3.0                  # 굴림 바퀴 토크 [N·m/rad] (추정, 시험으로 조정)
+    roll_kd: 0.3
+    roll_max_torque: 2.3          # 굴림 모터 스톨 (바퀴 모터와 같은 모터)
+    roll_sign: -1.0               # 굴림 토크 방향 (시험으로 확인)
+    align_before: 0.30            # 머리가 엘보 곡선 시작 이만큼 앞에서 굽힘 평면을 엘보 평면으로 [m]
+    spawn_x: 0.65                 # 뒤 끝(base_link 에서 -0.418 m)이 입구 안쪽에 들어가게
+    body_len: 0.145
     tof: false
-    bench_spines: ['base_link:link4']   # 지그재그라 마디 하나씩은 늘 기울어 있음 -> 앞뒤 끝을 이은 방향으로 정렬 측정
+    bench_spines: ['base_link:link4']
+    # 물리 설정 (2026-10-22 비교): ODE 검출기 + 메시 배관에서 직관 5 cm/s 로 끝까지 감.
+    # Bullet 은 굴림 바퀴가 수치적으로 뒤로 밀려 못 씀. 박스 배관은 결과 같음 (느림)
+    dart_collision_detector: ode
+    pipe_box_collision: false

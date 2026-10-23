@@ -13,7 +13,7 @@
 | 프로젝트 | 황제펭귄 살리기 (100mm PVC 배관 검사 로봇) |
 | 환경 | Ubuntu 22.04, ROS 2 Humble, Gazebo Fortress, Python 3.10 |
 
-> **현재 상태 (2026-10-19):** 설계를 처음부터 다시 하기 위해 이전 모델과 벤치 결과를 모두 지웠습니다 (이전 기록은 git 커밋 `810a8d1`). 지금은 논문 로봇을 재현한 참고 모델 2종(`vshape100`, `airo71`)만 있고 아직 시험 전입니다. 새 모델은 [docs/02 규약](docs/02_차체_모델.md)에 맞춰 `src/pipe_robot_sim/models/`에 추가합니다.
+> **현재 상태 (2026-10-22):** 모델은 뱀형 V자 2종입니다. `snake_v`는 수평 좌·우, 위 90° 엘보를 통과하고 (배관 모양을 아는 oracle 제어), `snake_v2`(실제 부품 + 꼬리 끝 탐촉자)는 아직 엘보 입구에서 멈춥니다. 결과는 [docs/05](docs/05_결과_요약.md). 새 모델은 [docs/02 규약](docs/02_차체_모델.md)에 맞춰 `src/pipe_robot_sim/models/`에 추가합니다.
 
 ---
 
@@ -55,7 +55,7 @@ ps -eo pid,args | grep "ign gazebo" | grep -v grep
 | **물리** | Gazebo Fortress (중력, 마찰, 충돌). 바퀴는 모터 토크 (스톨 토크와 역기전력 특성) |
 | **노드** | `motor_driver` (속도 PID → 바퀴 토크), `encoder_sim` (엔코더 카운트), `odometry` (엔코더 + IMU 추측항법, 정답과 오차 비교), `pipe_markers` (RViz 배관) |
 | **도구** | `bench` (모델 × 배관 자동 주행 평가), `layout_check` (부품 배치 검사, 질량·무게중심), `generate_world` (배관 SDF만 생성) |
-| **차체 모델** | 참고 모델 `vshape100` (V자형 100mm 로봇), `airo71` (AIRo-7.1). 구조와 추정값은 [docs/02](docs/02_차체_모델.md) |
+| **차체 모델** | `snake_v`, `snake_v2` (뱀형 V자, PIRATE 방식). 관절 제어는 `snake_gait` 노드. 구조와 추정값은 [docs/02](docs/02_차체_모델.md) |
 
 ---
 

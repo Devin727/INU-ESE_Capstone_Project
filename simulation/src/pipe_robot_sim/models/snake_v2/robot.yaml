@@ -1,0 +1,29 @@
+# 뱀형 V자 + 꼬리 끝 탐촉자 (D안). 모양은 snake_v2.urdf.xacro, 관절 제어는 snake_gait 노드
+# 부품 크기·질량·모터·서보 값은 대부분 추정 (docs/08)
+/**:
+  ros__parameters:
+    wheel_joints: [w1_l_joint, w1_r_joint, w2_l_joint, w2_r_joint, w3_l_joint, w3_r_joint,
+                   w4_l_joint, w4_r_joint, w5_l_joint, w5_r_joint, w6_l_joint, w6_r_joint]
+    wheel_radius: 0.015
+    encoder_cpr: 2800             # 추정 (N20 1:100)
+    motor_stall_torque: 0.147
+    motor_no_load_speed: 16.8
+    supply_voltage: 7.4
+    rated_voltage: 6.0
+    servo_joints: [j1_joint, j2_joint, j3_joint, j4_joint, j5_joint, j6_joint, probe_lift_joint]
+    servo_modes: [active, active, active, active, active, active, active]
+    # snake_gait 노드
+    snake_gait: true
+    gait_mode: oracle             # clamp = 두 V 누름만, oracle = 엘보 통과 순서 (배관 모양을 아는 상한 확인용)
+    arm_len: 0.085                # xacro L
+    wheel_y: 0.020                # xacro yw
+    head_len: 0.095               # xacro Lh
+    mid_len: 0.10                 # J2 ~ J4 (xacro Lmid + Lhub)
+    driven_wheels: [w1, w2, w3, w4, w5, w6]   # 모두 구동 (w3, w4 를 빼면 엘보 입구에서 멈춤)
+    clamp_extra_deg: 10.0
+    spawn_x: 0.31                 # 꼬리 끝 탐촉자까지 입구 안쪽에 들어가게
+    spawn_dz: -0.025              # 뱀은 축보다 25 mm 아래, 검사 마디는 견인봉으로 배관 중심 (xacro tow_dz 와 짝)
+    spawn_roll_deg: 0.0
+    body_len: 0.05
+    tof: true                     # 머리 ToF 3개 (gpu_lidar, 화면 필요)
+    bench_spines: [base_link]

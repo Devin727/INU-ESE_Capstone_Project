@@ -1,0 +1,376 @@
+<?xml version="1.0"?>
+<!-- 뱀형 V자 + 꼬리 끝 탐촉자 (snake_v 를 실제 부품이 들어가게 다시 잡은 판, 2026-10-21~22)
+     뒤 -> 앞:  [탐촉자] ─ w1 ─ r1 ─ J1(w2) ─ r2 ─ J2(w3) ─ [가운데 몸통 mid_rear] ─ J3(비틀기) ─ [허브 base_link] ─ J4(w4) ─ f1 ─ J5(w5) ─ f2 ─ J6(w6) ─ 머리
+     snake_v 와 다른 점
+       - J3 를 가운데 링크 중간이 아니라 J4 쪽 끝으로 (J2~J3 70 mm, J3~J4 30 mm). 가운데 몸통이 한 덩어리여야 18650 두 개(각 65 mm)가 들어감
+       - 바퀴 좌우 간격 ±16 -> ±20 mm: 바퀴 사이에 관절 서보(MG90S 높이 28.5 mm)가 들어가게
+       - 링크 몸체를 부품이 들어가는 크기로: 폭 28 mm, 팔 두께 24 mm, 가운데·허브는 아래 14 / 위 24 mm, 머리 95 mm (Pi Zero 가 들어가게)
+       - 바퀴 6쌍 모두 구동 (N20 6개). w3, w4 (가운데 링크) 를 자유 회전으로 두면 엘보 입구에서 멈춤 (2026-10-21).
+         단 w3, w4 의 N20 자리는 아직 없음 (가운데 몸통 = 배터리, 허브 = J3 서보) -> 배치 미해결, 부품 상자 안 넣음
+       - V 팔 하나 약 70 g (무게추 포함). 더 가벼우면 엘보 안에서 멈춤
+       - 부품을 상자로 넣음 (질량·위치 반영, RViz 에서 반투명 몸체 안에 보임). 크기·질량은 대부분 추정 (docs/08)
+       - ToF 3개 (머리): 전방 VL53L7CX 8x8 (60°x60°), 좌우 VL6180
+       - 검사부 (D안): 탐촉자를 뒤 V 꼬리 끝에 달고 8방향은 몸 전체 축 회전으로 잼 (아래 "꼬리 끝 탐촉자").
+         처음엔 노션 v2 처럼 견인봉으로 끄는 검사 마디(Ø56 x 110)였는데 엘보에서 계속 막혀 지움 (docs/05, git 기록 없음)
+     관절 부호·좌표는 snake_v 와 같음: base_link 원점 = J3, 앞 = +x. 앞쪽 사슬 +q = 앞 끝 내려감, 뒤쪽 사슬 +q = 뒤 끝 올라감.
+     탐촉자 명령: /servo/probe_lift_joint [m] (0 = 듦, 0.0115 = 벽에 누름) -->
+<robot name="snake_v2" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="pipe_inner_d" default="0.1008"/>
+  <xacro:arg name="params_file" default=""/>
+  <xacro:arg name="suspension" default="all"/>
+  <xacro:include filename="$(find pipe_robot_sim)/models/common/common.xacro"/>
+
+  <!-- ===== 치수 ===== -->
+  <xacro:property name="Rp" value="${$(arg pipe_inner_d)/2}"/>
+  <xacro:property name="L" value="0.085"/>       <!-- V 팔 (관절 ~ 관절) -->
+  <xacro:arg name="hub_len" default="0.030"/>
+  <xacro:property name="Lhub" value="$(arg hub_len)"/>   <!-- J3 ~ J4 (허브: 비틀기 서보) -->
+  <xacro:property name="Lmid" value="${0.100 - Lhub}"/>   <!-- J2 ~ J3 (가운데 몸통: 배터리). J2~J4 = 100 mm -->
+  <xacro:arg name="head_len" default="0.095"/>
+  <xacro:arg name="tip_probe" default="true"/>   <!-- 현재 방식 (D안): 뒤 V 꼬리 끝 탐촉자 -->
+  <xacro:property name="Lh" value="$(arg head_len)"/>   <!-- 머리 (J6 ~ 앞 끝) -->
+  <xacro:property name="W" value="0.028"/>       <!-- 몸체 폭 (바퀴 안쪽 면 사이 30 mm) -->
+  <xacro:property name="Ta" value="0.024"/>      <!-- 팔 두께 -->
+  <xacro:property name="zb" value="-0.014"/>     <!-- 가운데·허브·머리 아랫면 (벽 쪽) -->
+  <xacro:property name="zt" value="0.024"/>      <!-- 가운데·허브 윗면 (배관 중심 쪽). 24 넘으면 J3 로 90° 돌 때 벽에 닿음 -->
+  <xacro:property name="zth" value="0.020"/>     <!-- 머리 윗면 -->
+  <xacro:property name="rw" value="0.015"/>      <!-- 바퀴 반경 (Ø30) -->
+  <xacro:property name="ww" value="0.010"/>
+  <xacro:arg name="wheel_y" default="0.020"/>
+  <xacro:property name="yw" value="$(arg wheel_y)"/>   <!-- 바퀴 중심 좌우 위치 (±) -->
+
+  <!-- 몸체 껍데기 질량 (PLA, 추정) -->
+  <!-- 팔 껍데기 + 무게추. 부품 합(서보·N20 약 26 g)과 합쳐 팔 하나 약 70 g. 팔이 약 40 g 이면 엘보 안에서 멈춤
+       (snake_v 에서 하나씩 바꿔 가며 확인, 2026-10-21). 실물은 무게추 또는 무거운 부품(배터리 등)을 팔로 -->
+  <xacro:property name="m_arm" value="0.042"/>
+  <xacro:property name="m_mid" value="0.018"/>
+  <xacro:property name="m_hub" value="0.008"/>
+  <xacro:property name="m_head" value="0.014"/>
+  <xacro:property name="m_wheel" value="0.006"/>  <!-- 3D 프린팅 + O링 -->
+  <!-- 부품 질량 (추정, 판매처 표기 또는 비슷한 제품 기준) -->
+  <xacro:property name="m_servo" value="0.0134"/> <!-- MG90S -->
+  <xacro:property name="m_n20" value="0.012"/>    <!-- N20 1:100 + 엔코더 -->
+
+  <xacro:arg name="motor_stall" default="0.147"/>   <!-- 바퀴 모터 스톨 토크 [N·m] (robot.yaml motor_stall_torque 와 같게) -->
+  <xacro:property name="wheel_damping" value="${$(arg motor_stall)/16.8}"/>
+  <xacro:property name="mu_wheel" value="0.8"/>
+
+  <!-- 관절 서보 토크 한계 [N·m]: snake_v 와 같게 둠 (비교용). MG90S 는 약 0.2 라서 부족 -> 서보 선정 필요 -->
+  <xacro:arg name="servo_tmax" default="0"/>   <!-- 0 이 아니면 모든 관절 서보 토크 한계를 이 값으로 (실물 서보 시험) -->
+  <xacro:property name="ts" value="$(arg servo_tmax)"/>
+  <xacro:property name="t_clamp" value="${ts if ts > 0 else 1.2}"/>
+  <xacro:property name="t_hold" value="${ts if ts > 0 else 1.0}"/>
+  <xacro:property name="t_roll" value="${ts if ts > 0 else 1.0}"/>
+  <xacro:property name="jlim" value="${radians(120)}"/>
+  <xacro:property name="servo_damping" value="0.07"/>   <!-- snake_v 참고 (d_gain 대신 관절 damping) -->
+
+  <!-- ===== 색 ===== -->
+  <material name="shell"><color rgba="0.85 0.87 0.92 0.30"/></material>
+  <material name="shell_blue"><color rgba="0.30 0.50 0.90 0.30"/></material>
+  <material name="c_servo"><color rgba="0.15 0.25 0.70 1"/></material>
+  <material name="c_motor"><color rgba="0.80 0.65 0.20 1"/></material>
+  <material name="c_cell"><color rgba="0.20 0.60 0.30 1"/></material>
+  <material name="c_pcb"><color rgba="0.05 0.40 0.20 1"/></material>
+  <material name="c_pi"><color rgba="0.10 0.55 0.15 1"/></material>
+  <material name="c_sensor"><color rgba="0.60 0.20 0.70 1"/></material>
+  <material name="c_ut"><color rgba="0.95 0.45 0.10 1"/></material>
+  <material name="c_hv"><color rgba="0.85 0.10 0.10 1"/></material>
+  <material name="c_pump"><color rgba="0.10 0.60 0.70 1"/></material>
+  <material name="c_tank"><color rgba="0.50 0.85 0.95 0.6"/></material>
+  <material name="c_dark"><color rgba="0.08 0.08 0.08 1"/></material>
+  <material name="c_metal"><color rgba="0.65 0.65 0.70 1"/></material>
+  <material name="tire_black"><color rgba="0.12 0.12 0.12 1"/></material>
+  <material name="mark_yellow"><color rgba="0.95 0.80 0.10 1"/></material>
+
+  <!-- ===== 매크로 ===== -->
+  <!-- 부품 상자: 부모 링크에 고정 (Gazebo 에서는 부모 링크 질량에 합쳐짐) -->
+  <xacro:macro name="part" params="name parent xyz sx sy sz mass mat">
+    <joint name="${name}_fix" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${name}"/>
+      <origin xyz="${xyz}" rpy="0 0 0"/>
+    </joint>
+    <link name="${name}">
+      <visual><geometry><box size="${sx} ${sy} ${sz}"/></geometry><material name="${mat}"/></visual>
+      <xacro:inertial_box m="${mass}" x="${sx}" y="${sy}" z="${sz}"/>
+    </link>
+  </xacro:macro>
+  <!-- 부품 원통 (기본: 축 = x) -->
+  <xacro:macro name="part_cyl" params="name parent xyz r l mass mat rpy:='0 ${pi/2} 0'">
+    <joint name="${name}_fix" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${name}"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+    <link name="${name}">
+      <visual><geometry><cylinder radius="${r}" length="${l}"/></geometry><material name="${mat}"/></visual>
+      <xacro:inertial_cyl m="${mass}" r="${r}" l="${l}"/>
+    </link>
+  </xacro:macro>
+
+  <!-- V 팔: dir = +1 이면 관절에서 +x 로, -1 이면 -x 로. 충돌체는 양 끝 바퀴 자리만큼 짧게 -->
+  <xacro:macro name="arm_link" params="name dir">
+    <link name="${name}">
+      <visual>
+        <origin xyz="${dir*L/2} 0 0" rpy="0 0 0"/>
+        <geometry><box size="${L - 0.006} ${W} ${Ta}"/></geometry>
+        <material name="shell"/>
+      </visual>
+      <collision>
+        <origin xyz="${dir*L/2} 0 0" rpy="0 0 0"/>
+        <geometry><box size="${L - 2*rw*1.1} ${W} ${Ta}"/></geometry>
+      </collision>
+      <xacro:inertial_box m="${m_arm}" x="${L}" y="${W}" z="${Ta}" xyz="${dir*L/2} 0 0"/>
+    </link>
+  </xacro:macro>
+
+  <!-- 바퀴 한 쌍. spin = -1: 위 벽에 닿는 꼭짓점 바퀴 (축을 뒤집어 같은 + 속도에 앞으로) -->
+  <xacro:macro name="wheel_pair" params="name parent x spin:=1">
+    <xacro:wheel name="${name}_l" parent="${parent}" x="${x}" side="1" spin="${spin}"/>
+    <xacro:wheel name="${name}_r" parent="${parent}" x="${x}" side="-1" spin="${spin}"/>
+  </xacro:macro>
+  <xacro:macro name="wheel" params="name parent x side spin">
+    <joint name="${name}_joint" type="continuous">
+      <parent link="${parent}"/>
+      <child link="${name}"/>
+      <origin xyz="${x} ${side*yw} 0" rpy="0 0 0"/>
+      <axis xyz="0 ${spin} 0"/>
+      <dynamics damping="${wheel_damping}" friction="0"/>
+    </joint>
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="${rw}" length="${ww}"/></geometry>
+        <material name="tire_black"/>
+      </visual>
+      <visual>
+        <origin xyz="0 ${side*ww/2} 0" rpy="${pi/2} 0 0"/>
+        <geometry><box size="${1.6*rw} 0.004 0.001"/></geometry>
+        <material name="mark_yellow"/>
+      </visual>
+      <collision>
+        <geometry><sphere radius="${rw}"/></geometry>
+      </collision>
+      <xacro:inertial_cyl m="${m_wheel}" r="${rw}" l="${ww}" rpy="${pi/2} 0 0"/>
+    </link>
+    <xacro:friction link="${name}" mu="${mu_wheel}"/>
+    <xacro:joint_force joint="${name}_joint"/>
+  </xacro:macro>
+
+  <xacro:macro name="pitch_joint" params="name parent child x tmax">
+    <joint name="${name}" type="revolute">
+      <parent link="${parent}"/>
+      <child link="${child}"/>
+      <origin xyz="${x} 0 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="${-jlim}" upper="${jlim}" effort="${tmax}" velocity="3.0"/>
+      <dynamics damping="${servo_damping}" friction="0"/>
+    </joint>
+    <xacro:joint_servo joint="${name}" p="2" d="0" tmax="${tmax}"/>
+  </xacro:macro>
+
+  <!-- 관절 하나에 서보 + (구동이면) N20. 서보는 관절 쪽 끝, N20 은 반대쪽 끝 (바퀴 축까지 기어로) -->
+  <xacro:macro name="arm_parts" params="link dir servo motor:=''">
+    <xacro:part name="p_${servo}_servo" parent="${link}" xyz="${dir*0.014} 0 0" sx="0.023" sy="0.028" sz="0.0122"
+                mass="${m_servo}" mat="c_servo"/>
+    <xacro:if value="${motor != ''}">
+      <xacro:part name="p_${motor}_n20" parent="${link}" xyz="${dir*(L - 0.020)} 0 0" sx="0.034" sy="0.012" sz="0.010"
+                  mass="${m_n20}" mat="c_motor"/>
+    </xacro:if>
+  </xacro:macro>
+
+  <!-- 단일점·다중점 ToF (gpu_lidar). 화면(DISPLAY)이 있어야 값이 나옴 -->
+  <xacro:macro name="tof" params="name parent xyz rpy topic hs vs hfov vfov rmin rmax rate">
+    <joint name="${name}_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${name}_link"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+    <link name="${name}_link"/>
+    <gazebo reference="${name}_link">
+      <sensor name="${name}" type="gpu_lidar">
+        <topic>${topic}</topic>
+        <update_rate>${rate}</update_rate>
+        <always_on>1</always_on>
+        <visualize>false</visualize>
+        <ray>
+          <scan>
+            <horizontal><samples>${hs}</samples><resolution>1</resolution>
+              <min_angle>${-hfov/2}</min_angle><max_angle>${hfov/2}</max_angle></horizontal>
+            <vertical><samples>${vs}</samples><resolution>1</resolution>
+              <min_angle>${-vfov/2}</min_angle><max_angle>${vfov/2}</max_angle></vertical>
+          </scan>
+          <range><min>${rmin}</min><max>${rmax}</max><resolution>0.001</resolution></range>
+          <noise><type>gaussian</type><mean>0</mean><stddev>0.005</stddev></noise>
+        </ray>
+      </sensor>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- ===== 허브 (base_link, J3 ~ J4): 비틀기 서보 ===== -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="${Lhub/2} 0 ${(zb+zt)/2}" rpy="0 0 0"/>
+      <geometry><box size="${Lhub - 0.004} ${W} ${zt - zb}"/></geometry>
+      <material name="shell_blue"/>
+    </visual>
+    <collision>
+      <origin xyz="${Lhub/2} 0 ${(zb+zt)/2}" rpy="0 0 0"/>
+      <geometry><box size="${Lhub - 0.006} ${W} ${zt - zb}"/></geometry>
+    </collision>
+    <xacro:inertial_box m="${m_hub}" x="${Lhub}" y="${W}" z="${zt - zb}" xyz="${Lhub/2} 0 ${(zb+zt)/2}"/>
+  </link>
+  <xacro:part name="p_j3_servo" parent="base_link" xyz="0.015 0 0.005" sx="0.0285" sy="0.0122" sz="0.0228"
+              mass="${m_servo}" mat="c_servo"/>
+
+  <!-- J3: 비틀기 (축 x) -->
+  <joint name="j3_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="mid_rear"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="${-pi}" upper="${pi}" effort="${t_roll}" velocity="3.0"/>
+    <dynamics damping="${servo_damping}" friction="0"/>
+  </joint>
+  <xacro:joint_servo joint="j3_joint" p="10" d="0" tmax="${t_roll}"/>
+
+  <!-- ===== 가운데 몸통 (mid_rear, J2 ~ J3): 18650 x2 (위아래로 쌓음), 메인 ESP32, IMU ===== -->
+  <link name="mid_rear">
+    <visual>
+      <origin xyz="${-Lmid/2} 0 ${(zb+zt)/2}" rpy="0 0 0"/>
+      <geometry><box size="${Lmid - 0.004} ${W} ${zt - zb}"/></geometry>
+      <material name="shell_blue"/>
+    </visual>
+    <collision>
+      <origin xyz="${-Lmid/2} 0 ${(zb+zt)/2}" rpy="0 0 0"/>
+      <geometry><box size="${Lmid - 0.006} ${W} ${zt - zb}"/></geometry>
+    </collision>
+    <xacro:inertial_box m="${m_mid}" x="${Lmid}" y="${W}" z="${zt - zb}" xyz="${-Lmid/2} 0 ${(zb+zt)/2}"/>
+  </link>
+  <xacro:part_cyl name="p_cell_a" parent="mid_rear" xyz="-0.035 -0.0047 -0.0046" r="0.0093" l="0.065" mass="0.048" mat="c_cell"/>
+  <xacro:part_cyl name="p_cell_b" parent="mid_rear" xyz="-0.035 -0.0047 0.0141" r="0.0093" l="0.065" mass="0.048" mat="c_cell"/>
+  <xacro:part name="p_esp32_main" parent="mid_rear" xyz="-0.043 0.0093 0.005" sx="0.054" sy="0.005" sz="0.028"
+              mass="0.009" mat="c_pcb"/>
+  <xacro:part name="p_mpu6050" parent="mid_rear" xyz="-0.008 0.0093 0.005" sx="0.016" sy="0.003" sz="0.021"
+              mass="0.002" mat="c_sensor"/>
+
+  <!-- ===== 앞쪽: J4(w4) ─ f1 ─ J5(w5) ─ f2 ─ J6(w6) ─ 머리 ===== -->
+  <xacro:wheel_pair name="w4" parent="base_link" x="${Lhub}"/>
+  <xacro:pitch_joint name="j4_joint" parent="base_link" child="f1" x="${Lhub}" tmax="${t_hold}"/>
+  <xacro:arm_link name="f1" dir="1"/>
+  <xacro:arm_parts link="f1" dir="1" servo="j4" motor="w5"/>
+  <xacro:part name="p_mp1584_logic" parent="f1" xyz="0.037 0 0.0035" sx="0.022" sy="0.017" sz="0.004" mass="0.002" mat="c_pcb"/>
+  <xacro:part name="p_mp1584_servo" parent="f1" xyz="0.037 0 -0.0035" sx="0.022" sy="0.017" sz="0.004" mass="0.002" mat="c_pcb"/>
+  <xacro:wheel_pair name="w5" parent="f1" x="${L}" spin="-1"/>
+  <xacro:pitch_joint name="j5_joint" parent="f1" child="f2" x="${L}" tmax="${t_clamp}"/>
+  <xacro:arm_link name="f2" dir="1"/>
+  <xacro:arm_parts link="f2" dir="1" servo="j5" motor="w6"/>
+  <xacro:part name="p_drv8833_front" parent="f2" xyz="0.037 0 -0.005" sx="0.018" sy="0.016" sz="0.004" mass="0.002" mat="c_pcb"/>
+  <xacro:part name="p_bms" parent="f2" xyz="0.037 0 0.005" sx="0.020" sy="0.012" sz="0.003" mass="0.003" mat="c_pcb"/>
+  <xacro:wheel_pair name="w6" parent="f2" x="${L}"/>
+  <xacro:pitch_joint name="j6_joint" parent="f2" child="head" x="${L}" tmax="${t_hold}"/>
+
+  <!-- 머리: J6 서보, Pi Zero 2 W (세워서), 카메라 + LED, ToF 3개 -->
+  <link name="head">
+    <visual>
+      <origin xyz="${Lh/2} 0 ${(zb+zth)/2}" rpy="0 0 0"/>
+      <geometry><box size="${Lh - 0.004} ${W} ${zth - zb}"/></geometry>
+      <material name="shell"/>
+    </visual>
+    <collision>
+      <origin xyz="${(rw*1.1 + Lh)/2} 0 ${(zb+zth)/2}" rpy="0 0 0"/>
+      <geometry><box size="${Lh - rw*1.1} ${W} ${zth - zb}"/></geometry>
+    </collision>
+    <xacro:inertial_box m="${m_head}" x="${Lh}" y="${W}" z="${zth - zb}" xyz="${Lh/2} 0 ${(zb+zth)/2}"/>
+  </link>
+  <xacro:part name="p_j6_servo" parent="head" xyz="0.014 0 0" sx="0.023" sy="0.028" sz="0.0122" mass="${m_servo}" mat="c_servo"/>
+  <xacro:part name="p_pi_zero" parent="head" xyz="0.058 0.008 0.001" sx="0.065" sy="0.005" sz="0.030" mass="0.011" mat="c_pi"/>
+  <xacro:part name="p_camera" parent="head" xyz="0.0925 -0.001 0.008" sx="0.004" sy="0.025" sz="0.024" mass="0.003" mat="c_pcb"/>
+  <xacro:part_cyl name="p_lens" parent="head" xyz="0.0960 -0.001 0.008" r="0.004" l="0.004" mass="0.001" mat="c_dark"/>
+  <xacro:part name="p_vl53l7cx" parent="head" xyz="0.0935 0 -0.009" sx="0.002" sy="0.013" sz="0.009" mass="0.001" mat="c_sensor"/>
+  <xacro:part name="p_vl6180_l" parent="head" xyz="0.078 0.013 -0.006" sx="0.010" sy="0.002" sz="0.010" mass="0.0015" mat="c_sensor"/>
+  <xacro:part name="p_vl6180_r" parent="head" xyz="0.078 -0.013 -0.006" sx="0.010" sy="0.002" sz="0.010" mass="0.0015" mat="c_sensor"/>
+  <!-- 전방 VL53L7CX: 8x8, 60°x60°, 2 cm ~ 3.5 m, 8x8 모드 최대 15 Hz -->
+  <xacro:tof name="tof_front" parent="head" xyz="${Lh + 0.001} 0 -0.009" rpy="0 0 0" topic="/tof/front"
+             hs="8" vs="8" hfov="${radians(60)}" vfov="${radians(60)}" rmin="0.02" rmax="3.5" rate="15"/>
+  <!-- 좌우 VL6180: 한 점, 0.5 ~ 20 cm (데이터시트 기본 10 cm, 조건 좋으면 더) -->
+  <xacro:tof name="tof_left" parent="head" xyz="0.078 0.0145 -0.006" rpy="0 0 ${pi/2}" topic="/tof/left"
+             hs="1" vs="1" hfov="0" vfov="0" rmin="0.005" rmax="0.2" rate="30"/>
+  <xacro:tof name="tof_right" parent="head" xyz="0.078 -0.0145 -0.006" rpy="0 0 ${-pi/2}" topic="/tof/right"
+             hs="1" vs="1" hfov="0" vfov="0" rmin="0.005" rmax="0.2" rate="30"/>
+
+  <!-- ===== 뒤쪽: J2(w3) ─ r2 ─ J1(w2) ─ r1 ─ w1 ===== -->
+  <xacro:wheel_pair name="w3" parent="mid_rear" x="${-Lmid}"/>
+  <xacro:pitch_joint name="j2_joint" parent="mid_rear" child="r2" x="${-Lmid}" tmax="${t_hold}"/>
+  <xacro:arm_link name="r2" dir="-1"/>
+  <xacro:arm_parts link="r2" dir="-1" servo="j2" motor="w2"/>
+  <xacro:part name="p_drv8833_rear" parent="r2" xyz="-0.037 0 0" sx="0.018" sy="0.016" sz="0.004" mass="0.002" mat="c_pcb"/>
+  <xacro:wheel_pair name="w2" parent="r2" x="${-L}" spin="-1"/>
+  <xacro:pitch_joint name="j1_joint" parent="r2" child="r1" x="${-L}" tmax="${t_clamp}"/>
+  <xacro:arm_link name="r1" dir="-1"/>
+  <xacro:arm_parts link="r1" dir="-1" servo="j1" motor="w1"/>
+  <xacro:wheel_pair name="w1" parent="r1" x="${-L}"/>
+
+  <!-- ===== 꼬리 끝 탐촉자 (D안, 2026-10-21) =====
+       끄는 검사 마디는 엘보에서 계속 막혀서 (docs/05), 탐촉자를 뒤 V 꼬리 끝에 붙임. 측정할 때 V 가 벽을 누르는 힘으로 버티고,
+       8방향은 몸 전체를 J3 로 45° 씩 돌려 잼 (앞 V 잡음 -> 뒤 V 풂 -> J3 45° -> 뒤 V 잡음 -> 측정 -> 앞 V 풀고 J3 원위치).
+       마운트: w1 축에서 r1 을 따라 10 mm 뒤. 누른 V 에서 r1 이 θ(약 43°) 기울어 있어 마운트를 θ 만큼 돌려 -z 가 벽을 향함.
+       이 점에서 벽까지 약 14 mm (= (Rp - rw - h) - 10 sin θ). 든 상태에서 슈가 벽에서 약 10 mm:
+       엘보 통과 중 뒤 V 가 벌어져 r1 각도가 바뀌어도 안 끌리게 (20 mm 뒤·간격 3.5 mm 로 했더니 슈가 끌려 엘보 입구에서 멈춤)
+       들어올림 = 위치 명령 (실물은 스프링이 누르고 SG90 이 듦), 슈 = 2축 ±11° 자가 정렬. 탐촉자 몸통은 벽 반대쪽(배관 중심 쪽)으로 섬.
+       UT 보드·HV·펌프 자리는 미정 (작은 꼬리 포드 또는 팔 안, 다음 단계) -->
+  <xacro:if value="$(arg tip_probe)">
+    <xacro:property name="th_v" value="${asin(min(1.0, 2*sqrt((Rp - rw)**2 - yw**2)/L))}"/>
+    <joint name="probe_mount_fix" type="fixed">
+      <parent link="r1"/>
+      <child link="probe_mount"/>
+      <origin xyz="${-L - 0.010} 0 0" rpy="0 ${th_v} 0"/>
+    </joint>
+    <link name="probe_mount">
+      <visual><origin xyz="0.010 0 0" rpy="0 0 0"/><geometry><box size="0.022 0.020 0.004"/></geometry><material name="c_metal"/></visual>
+      <xacro:inertial_box m="0.004" x="0.022" y="0.020" z="0.004" xyz="0.010 0 0"/>
+    </link>
+    <xacro:part name="p_sg90" parent="probe_mount" xyz="0.008 0 0.012" sx="0.023" sy="0.012" sz="0.016" mass="0.009" mat="c_servo"/>
+    <joint name="probe_lift_joint" type="prismatic">   <!-- 0 = 듦 (슈 면이 마운트에서 4 mm), 0.0115 = 벽(약 14 mm) + 1 mm -->
+      <parent link="probe_mount"/>
+      <child link="probe_carrier"/>
+      <origin xyz="0 0 -0.004" rpy="0 0 0"/>
+      <axis xyz="0 0 -1"/>
+      <limit lower="0" upper="0.0115" effort="3" velocity="0.1"/>
+      <dynamics damping="5" friction="0"/>
+    </joint>
+    <xacro:joint_servo joint="probe_lift_joint" p="400" d="0" tmax="3"/>
+    <link name="probe_carrier">
+      <inertial><mass value="0.003"/><inertia ixx="1e-7" iyy="1e-7" izz="1e-7" ixy="0" ixz="0" iyz="0"/></inertial>
+    </link>
+    <xacro:macro name="tip_tilt" params="name parent child axis xyz:='0 0 0'">
+      <joint name="${name}" type="revolute">
+        <parent link="${parent}"/>
+        <child link="${child}"/>
+        <origin xyz="${xyz}" rpy="0 0 0"/>
+        <axis xyz="${axis}"/>
+        <limit lower="-0.2" upper="0.2" effort="1" velocity="5"/>
+        <dynamics damping="0.0005" friction="0"/>
+      </joint>
+      <xacro:joint_spring joint="${name}" k="0.02" ref="0"/>
+    </xacro:macro>
+    <xacro:tip_tilt name="probe_tilt_x_joint" parent="probe_carrier" child="probe_tilt" axis="1 0 0" xyz="0 0 0.006"/>
+    <link name="probe_tilt">
+      <inertial><mass value="0.002"/><inertia ixx="1e-7" iyy="1e-7" izz="1e-7" ixy="0" ixz="0" iyz="0"/></inertial>
+    </link>
+    <xacro:tip_tilt name="probe_tilt_y_joint" parent="probe_tilt" child="probe" axis="0 1 0" xyz="0 0 -0.006"/>
+    <link name="probe">   <!-- 원점 = 슈 바깥면 중심, -z 가 벽 쪽 -->
+      <visual><origin xyz="0 0 0.002" rpy="0 0 0"/><geometry><box size="0.025 0.016 0.004"/></geometry><material name="c_ut"/></visual>
+      <visual><origin xyz="0 0 0.018" rpy="0 0 0"/><geometry><cylinder radius="0.009" length="0.028"/></geometry>
+        <material name="c_metal"/></visual>
+      <visual><origin xyz="0 0 0.034" rpy="0 ${pi/2} 0"/><geometry><cylinder radius="0.003" length="0.012"/></geometry>
+        <material name="c_dark"/></visual>   <!-- 직결 동축선 (BNC 는 커서 뺌) -->
+      <collision><origin xyz="0 0 0.002" rpy="0 0 0"/><geometry><box size="0.025 0.016 0.004"/></geometry></collision>
+      <xacro:inertial_cyl m="0.028" r="0.009" l="0.028" xyz="0 0 0.016"/>
+    </link>
+    <xacro:friction link="probe" mu="0.3"/>
+  </xacro:if>
+
+  <!-- ===== 시뮬 플러그인 (IMU = 가운데 몸통의 MPU6050 자리) ===== -->
+  <xacro:sim_common imu_parent="mid_rear" imu_xyz="-0.008 0.0093 0.005"/>
+</robot>
