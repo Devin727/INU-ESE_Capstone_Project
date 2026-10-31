@@ -38,12 +38,18 @@
   <xacro:property name="mu_wheel" value="$(arg mu_wheel)"/>   <!-- 고무 바퀴 ↔ PVC, 추정 -->
 
   <!-- 관절 서보 (추정): 꼭짓점 J1, J5 = 누르는 관절, 나머지 = 자세 유지 -->
+  <xacro:arg name="clamp_spring_k" default="0"/>     <!-- V 꼭짓점(J1, J5) 스프링 강성 [N·m/rad], 0 = 없음 -->
+  <xacro:arg name="clamp_spring_ref" default="4.0"/>  <!-- 스프링 자유각 크기 [rad] (J1 은 -, J5 는 +) -->
   <xacro:arg name="servo_p" default="2"/>   <!-- 서보 위치 게인 [N·m/rad] -->
   <xacro:arg name="servo_scale" default="1.0"/>   <!-- 비교 시험용: 서보 토크 한계 배율 -->
-  <xacro:property name="t_clamp" value="${1.2*$(arg servo_scale)}"/>    <!-- J1, J5 토크 한계 [N·m] -->
-  <xacro:property name="t_hold" value="${1.0*$(arg servo_scale)}"/>     <!-- J2, J4, J6 -->
+  <!-- 관절별 토크 한계를 직접 줄 때 (0 = 위 배율 사용). 서보 선정 시험용 [N·m] -->
+  <xacro:arg name="t_clamp_set" default="0"/>
+  <xacro:arg name="t_hold_set" default="0"/>
+  <xacro:arg name="t_roll_set" default="0"/>
+  <xacro:property name="t_clamp" value="${$(arg t_clamp_set) if $(arg t_clamp_set) > 0 else 1.2*$(arg servo_scale)}"/>    <!-- J1, J5 토크 한계 [N·m] -->
+  <xacro:property name="t_hold" value="${$(arg t_hold_set) if $(arg t_hold_set) > 0 else 1.0*$(arg servo_scale)}"/>     <!-- J2, J4, J6 -->
   <xacro:arg name="roll_scale" default="1.0"/>
-  <xacro:property name="t_roll" value="${0.5*$(arg servo_scale)*$(arg roll_scale)}"/>     <!-- J3 -->
+  <xacro:property name="t_roll" value="${$(arg t_roll_set) if $(arg t_roll_set) > 0 else 0.5*$(arg servo_scale)*$(arg roll_scale)}"/>     <!-- J3 -->
   <xacro:property name="jlim" value="${radians(120)}"/>
   <!-- 서보 감쇠는 관절 damping 으로 (DART 가 암시적으로 적분 -> 안정). 제어기 d_gain 은 0:
        d_gain 은 오차의 미분이라 목표가 바뀔 때마다(50 Hz) 한 스텝 동안 최대 토크로 차서 관절이 속도 한계(3 rad/s)로
@@ -183,6 +189,12 @@
   <xacro:arm_link name="r2" dir="-1" length="${L}" mass="${m_arm}"/>
   <xacro:wheel_pair name="w2" parent="r2" x="${-L}" spin="-1"/>
   <xacro:pitch_joint name="j1_joint" parent="r2" child="r1" x="${-L}" tmax="${t_clamp}" p="$(arg servo_p)"/>
+  <!-- V 꼭짓점 누름 스프링 (시험용): 미리 감아 둔 약한 토션 스프링이 V 를 접는 쪽으로 늘 눌러 서보 부담을 덜어 줌.
+       토크 = k (ref - q). ref 를 관절 한계 너머로 두면 작동 범위에서 토크가 거의 일정 (k 0.15, ref 4 rad -> 96° 에서 약 0.35 N·m, 0° 에서 0.6 N·m) -->
+  <xacro:if value="${$(arg clamp_spring_k) > 0}">
+    <xacro:joint_spring joint="j1_joint" k="$(arg clamp_spring_k)" ref="${-$(arg clamp_spring_ref)}"/>
+    <xacro:joint_spring joint="j5_joint" k="$(arg clamp_spring_k)" ref="$(arg clamp_spring_ref)"/>
+  </xacro:if>
   <xacro:arm_link name="r1" dir="-1" length="${L}" mass="${m_arm}"/>
   <xacro:wheel_pair name="w1" parent="r1" x="${-L}"/>
 
