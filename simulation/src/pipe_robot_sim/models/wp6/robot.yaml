@@ -1,0 +1,27 @@
+# wp6: 벽 밀착 6륜 2모듈 (지도교수 개념도). 모양은 wp6.urdf.xacro. 가운데 관절은 wp_ctrl 노드가 서보로 굽힘, 다리는 스프링
+# 치수·모터·스프링 값은 모두 추정 (docs/08)
+/**:
+  ros__parameters:
+    wheel_joints: [f0_wheel_joint, f1_wheel_joint, f2_wheel_joint, r0_wheel_joint, r1_wheel_joint, r2_wheel_joint]
+    wheel_radius: 0.015
+    encoder_cpr: 2800             # 추정 (N20 1:100)
+    motor_stall_torque: 0.147
+    motor_no_load_speed: 16.8
+    supply_voltage: 7.4
+    rated_voltage: 6.0
+    drive_mode: diff              # 모든 바퀴 같은 토크 (전자식 차동): 엘보에서 안쪽·바깥 바퀴 속도가 달라도 서로 싸우지 않음
+    diff_feedback: median         # 벽에서 뜬 바퀴 하나가 헛돌아도 나머지 토크 유지 (motor_driver)
+    spawn_x: 0.22                 # 뒤 모듈 끝(base_link 에서 -0.19 m)이 입구 안쪽에 들어가게
+    spawn_roll_deg: 30.0          # 바퀴 줄 3개를 축 둘레로 30° 돌려 시작 (위 엘보는 0° 면 안쪽 벽 바퀴가 모서리에서 떠 못 지나감, docs/05)
+    body_len: 0.09
+    tof: false
+    bench_spines: [base_link]
+    # 가운데 관절 서보 (/servo/<관절>, rad), wp_ctrl 노드
+    servo_joints: [mid_pitch_joint, mid_yaw_joint]
+    servo_modes: [active, active]
+    wp_ctrl: true
+    ctrl_mode: oracle             # oracle = 배관 모양을 알고 앞 모듈을 엘보 방향으로 굽힘 (실물은 카메라 등으로 판단) | straight
+    ring_front_x: 0.025           # xacro x_ring_f 와 같게 (Lb/2 - ring_in)
+    ring_rear_x: -0.08            # xacro x_ring_r 와 같게 (-gap - Lb + ring_in)
+    lookahead: 0.0                # 앞 바퀴 줄에서 이만큼 앞 배관 방향으로 앞 모듈을 돌림 [m]
+    lookahead_down: 0.02          # 아래로 꺾이는 엘보만 (무게가 앞 모듈을 수직관으로 끌어 줌) [m]

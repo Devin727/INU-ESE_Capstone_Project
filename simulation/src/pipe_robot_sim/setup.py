@@ -39,6 +39,7 @@ setup(
             'pipe_markers = pipe_robot_sim.pipe_markers:main',
             'snake_gait = pipe_robot_sim.snake_gait:main',
             'airo_ctrl = pipe_robot_sim.airo_ctrl:main',
+            'wp_ctrl = pipe_robot_sim.wp_ctrl:main',
             'bench = pipe_robot_sim.bench:main',
             'layout_check = pipe_robot_sim.layout_check:main',
         ],

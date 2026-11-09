@@ -10,6 +10,8 @@ pub  /motor/<joint>/torque (std_msgs/Float64, 브리지 -> Gazebo)
      /motor/duty, /motor/wheel_speed (std_msgs/Float64MultiArray, 디버그)
 drive_mode: speed_pid (바퀴마다 속도 PID) | open_loop (duty = 목표/최고속도, 피드백 없음)
             | diff (평균 속도만 PID, 모든 바퀴 같은 토크 = 전자식 차동)
+diff_feedback: diff 의 속도 피드백. mean (평균, 기본) | median (중앙값: 벽에서 뜬 바퀴 하나가 헛돌아도
+            나머지 바퀴 토크가 줄지 않음. 평균이면 헛도는 바퀴가 평균을 채워 다른 바퀴가 멈춤, wp6 엘보 2026-10-31)
 /wheel_dirs (std_msgs/Float64MultiArray, wheel_joints 순서): 바퀴별 목표 속도 배수 (speed_pid, open_loop).
             1 = 그대로, -1 = 반대로, 0.5 = 절반, 0 = 제동 (속도 0 을 PID 로 붙잡음), NaN = 토크 0 (자유 회전).
             안 보내면 모두 1.
@@ -36,6 +38,7 @@ class MotorDriver(Node):
         self.v_ratio = d('supply_voltage', 7.4).value / d('rated_voltage', 6.0).value
         self.rate = d('control_rate', 100.0).value
         self.mode = d('drive_mode', 'speed_pid').value
+        self.diff_fb = d('diff_feedback', 'mean').value
         self.kp, self.ki, self.kd = d("kp", 0.01).value, d("ki", 1.0).value, d('kd', 0.0).value
         self.cmd_timeout = d('cmd_timeout', 0.5).value
         # 좌우 속도 차 조향 (무한궤도 등): 바퀴별 +1 = 왼쪽으로 돌 때 빨라지는 쪽(오른쪽) / -1 반대 / 0 조향 없음
@@ -94,7 +97,12 @@ class MotorDriver(Node):
         if self.mode == 'diff':
             # 전자식 차동: 평균 속도 하나만 PID, 모든 바퀴에 같은 duty (= 같은 토크)
             # -> 엘보에서 바깥·안쪽 바퀴가 서로 다른 속도로 자유롭게 돎 (바퀴끼리 싸우지 않음)
-            mean = sum(self.speed) / len(self.speed)
+            if self.diff_fb == 'median':
+                sp = sorted(self.speed)
+                k = len(sp) // 2
+                mean = sp[k] if len(sp) % 2 else (sp[k - 1] + sp[k]) / 2
+            else:
+                mean = sum(self.speed) / len(self.speed)
             err = target - mean
             self.integ[0] += err * (1.0 / self.rate)
             u = target / w_max + self.kp * err + self.ki * self.integ[0]

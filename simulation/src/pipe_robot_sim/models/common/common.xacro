@@ -175,6 +175,25 @@
     </gazebo>
   </xacro:macro>
 
+  <!-- 명시적 스프링: 위치 제어기를 스프링처럼 씀. 토크 = k (ref - q) - d q', |토크| <= tmax.
+       DART 의 joint_spring (implicitSpringDamper) 은 바퀴 접촉과 같이 쓰면 로봇이 혼자 뒤로 미끄러지는 경우가 있었음 (wp6, 2026-10-31).
+       토픽 /spring/<joint> 로 ref 를 바꿀 수 있음 (브리지는 연결 안 함) -->
+  <xacro:macro name="joint_pd_spring" params="joint k ref d:=0 tmax:=10">
+    <gazebo>
+      <plugin filename="ignition-gazebo-joint-position-controller-system"
+              name="ignition::gazebo::systems::JointPositionController">
+        <joint_name>${joint}</joint_name>
+        <topic>/spring/${joint}</topic>
+        <p_gain>${k}</p_gain>
+        <i_gain>0</i_gain>
+        <d_gain>${d}</d_gain>
+        <cmd_max>${tmax}</cmd_max>
+        <cmd_min>${-tmax}</cmd_min>
+        <initial_position>${ref}</initial_position>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+
   <xacro:macro name="friction" params="link mu">
     <gazebo reference="${link}">
       <mu1>${mu}</mu1>

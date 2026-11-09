@@ -175,6 +175,10 @@ def setup(context):
             actions.append(Node(package=PKG, executable='airo_ctrl', output='screen', parameters=[
                 params_file, sim, {'course': course, 'courses_file': courses_file,
                                    'fitting90': arg('fitting90'), 'fitting45': arg('fitting45')}]))
+        if rp.get('wp_ctrl'):   # wp6 가운데 관절 (앞 모듈을 엘보 쪽으로 굽힘)
+            actions.append(Node(package=PKG, executable='wp_ctrl', output='screen', parameters=[
+                params_file, sim, {'course': course, 'courses_file': courses_file,
+                                   'fitting90': arg('fitting90'), 'fitting45': arg('fitting45')}]))
         if gui:   # Gazebo 카메라가 로봇을 비스듬히 위에서 따라감 (GUI 오른쪽 위 메뉴에서 해제 가능)
             svc = lambda srv, typ, req: ExecuteProcess(cmd=[  # noqa: E731
                 'ign', 'service', '-s', srv, '--reqtype', typ, '--reptype', 'ignition.msgs.Boolean',
