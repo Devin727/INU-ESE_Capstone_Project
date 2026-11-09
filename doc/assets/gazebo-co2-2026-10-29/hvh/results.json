@@ -1,0 +1,18 @@
+{
+  "exit_code": 0,
+  "sim_end": 11.954,
+  "vertical_entry_time": 1.107,
+  "upper_horizontal_entry_time": 2.413,
+  "upper_horizontal_end_time": 2.663,
+  "end": {
+    "time": "11.954",
+    "x": "22.8526",
+    "y": "-14.3354",
+    "z": "-437.165",
+    "forward_z": "0.914677",
+    "gas_on": "1",
+    "model_x": "22.8658",
+    "model_y": "-14.3352",
+    "model_z": "-437.194"
+  }
+}

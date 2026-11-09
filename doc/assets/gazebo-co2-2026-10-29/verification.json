@@ -1,0 +1,10 @@
+{
+  "verified_on": "2026-11-09",
+  "checks_passed": 180,
+  "mass_runs_checked": 10,
+  "comparison_runs_checked": 4,
+  "hvh_runs_checked": 0,
+  "excluded_evidence": "hvh/trajectory.csv was overwritten during GUI replay and differs from hvh/results.json; use mass_sweep/300g_sweep_seed42_30s.csv for the final 300g path result",
+  "new_physics_runs": 0,
+  "scope": "Recorded results recalculated from CSV and checked against SDF/control source; not physical validation"
+}

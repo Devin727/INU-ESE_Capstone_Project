@@ -1,0 +1,7 @@
+{
+  "last_success_g": 400,
+  "first_failure_g": 420,
+  "step_g": 20,
+  "criterion": "front wheel station reaches upper horizontal x>=1.4m within 60 simulated seconds",
+  "mass_added_to": "chassis, with inertia scaled; wheels and carriers unchanged"
+}

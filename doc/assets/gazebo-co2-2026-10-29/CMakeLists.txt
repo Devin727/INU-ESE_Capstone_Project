@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.16)
+project(pipe_control)
+find_package(gz-sim REQUIRED)
+add_library(PipeControl SHARED PipeControl.cc)
+target_link_libraries(PipeControl PRIVATE gz-sim::gz-sim)
