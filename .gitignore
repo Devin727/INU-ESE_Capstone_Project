@@ -1,0 +1,5 @@
+# Local IDE settings
+.vscode/
+
+# macOS metadata
+.DS_Store

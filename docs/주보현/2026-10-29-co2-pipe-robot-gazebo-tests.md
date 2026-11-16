@@ -147,7 +147,7 @@ PVC 이름으로부터 물성이나 마찰이 자동 설정되는 것은 아니�
 재검증은 Python 표준 라이브러리만 필요하다. 저장소 루트에서 다음을 실행한다.
 
 ```text
-python doc/assets/gazebo-co2-2026-10-29/verify_records.py
+python docs/주보현/assets/gazebo-co2-2026-10-29/verify_records.py
 ```
 
 ## 8. 해석의 한계와 후속 실험
