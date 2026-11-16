@@ -1,5 +1,7 @@
 # 2026-09-17 배관 균열 검출과 매핑 기술 조사
 
+문서 작성자 · **alaekakan** · wnqhgus1209@gmail.com
+
 원본 PDF · **[26.09.17] Pipe crack detection Digging & Mapping** (5쪽)
 
 ## 균열 및 변형 검사
