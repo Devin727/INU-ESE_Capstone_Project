@@ -1,0 +1,8 @@
+/build/
+/include/board_config.local.h
+__pycache__/
+*.csv
+*.obj
+*.exe
+*.pdb
+*.ilk
