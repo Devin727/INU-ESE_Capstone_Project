@@ -5,3 +5,6 @@
 ![원통형 로봇 설계 미리보기](mechanical/cylindrical-body/images/assembly_preview.png)
 
 본 저장소의 모델은 1차 시제품 형상이며, 실제 90° 숏 엘보 통과와 수직 등판은 아직 검증되지 않았습니다.
+
+<img width="1774" height="1324" alt="image" src="https://github.com/user-attachments/assets/25cc1844-3cfc-4a99-99d9-049f56631570" />
+
