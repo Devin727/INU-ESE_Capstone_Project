@@ -15,6 +15,7 @@ SEAT_Y=9.0; EAR_Y0=21.5; EAR_Y1=29.5                       # 스프링 받침면
 Z_FRONT=34.0; FL_Z0=-87.5; FL_Z1=-85.0                     # 몸체 앞끝, 뒤 플랜지
 Z_SHELL0=-90.0; Z_CAP0=-106.0
 ESP_ANG=-74.0                                              # ESP32 칸 각도
+CR_Z0=-66.0; CR_Z1=-58.0; CR_RI=12.7; CR_RO=14.7                # 모터 뒤 받침 고리 (모터 캔 위, 엔코더 앞)
 TRAVEL=(2.0,0.0,-3.4)
 
 def box(x0,x1,y0,y1,z0,z1): return cq.Workplane("XY").box(x1-x0,y1-y0,z1-z0,centered=False).translate((x0,y0,z0))
@@ -34,6 +35,9 @@ def slider():
     s=s.union(box(1,12,EAR_Y0,EAR_Y1,20,30)).union(box(-11,-1,EAR_Y0,EAR_Y1,-30,-20))   # 귀(부싱 자리)
     s=s.union(box(1,14.5,18.5,EAR_Y1,18,20)).union(box(-22.5,-1,18.5,EAR_Y1,-20,-18))   # 앞·뒤 벽
     s=s.union(cylz(12.6,M_FACE,-20,MX,MY)).union(box(-1,MX,18.5,EAR_Y1,M_FACE,-20))       # 모터 고정판
+    # 모터 뒤 받침: 팔 + C형 고리. 몸체 벽 쪽(바깥)은 여유가 없어 열어 둠 (약 247도 감쌈)
+    ring=cylz(CR_RO,CR_Z0,CR_Z1,MX,MY).cut(box(7,20,-20,20,CR_Z0-1,CR_Z1+1).rotate((0,0,0),(0,0,1),math.degrees(math.atan2(MY,MX))).translate((MX,MY,0)))
+    s=s.union(box(1.5,6.2,18.5,EAR_Y1,CR_Z0,M_FACE)).union(ring).cut(cylz(CR_RI,CR_Z0-1,M_FACE,MX,MY))
     s=s.cut(box(11.9,MX+8,15,34.3,-7.5,7.5))                                # 웜 자리
     s=s.cut(cylx(20,-12,12,AX_Y,0))                                      # 바퀴 자리
     s=s.cut(cylx(BUSH_R,-23,-19,AX_Y,0)).cut(cylx(BUSH_R,11,15,AX_Y,0))  # 축 베어링 4x7
@@ -101,7 +105,8 @@ def bought_fixed():
             r=rotz(cyly(ROD_R,3,34,xr,z).union(cyly(3.5,31.5,34,xr,z)),120*k); rods=r if rods is None else rods.union(r)
     d["rods"]=rods
     d["mdd3a"]=box(-24.13,24.13,-20.83,20.83,Z_SHELL0-13.6,Z_SHELL0)
-    d["esp32"]=rotz(box(-0.8,0.8,16,43.94,-84.5,-30.2),ESP_ANG)
+    # ESP32 DevKitC V4 (CMODULE-40): 기판 + 부품면 높이 3.2 (핀헤더 없는 상태 가정)
+    d["esp32"]=rotz(box(-0.8,0.8,16,43.94,-84.5,-30.2).union(box(0.8,4.0,18,42,-84.5,-30.2)),ESP_ANG)
     return d
 PRINT=dict(slider=slider,hub=hub,sleeve=sleeve,spine=spine,shell=shell,front_cap=front_cap,rear_cap=rear_cap)
 
