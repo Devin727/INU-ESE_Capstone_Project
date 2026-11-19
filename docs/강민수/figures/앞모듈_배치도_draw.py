@@ -29,9 +29,9 @@ for k in range(3):
     ax.add_patch(Polygon(P(rect(-19.5,-11.5,31.95,49.95)),fc="#e8e0c8",ec="k",lw=.7,zorder=5))   # hub
     ax.add_patch(Polygon(P(rect(-22.5,-20,34,44.5)),fc=C["plate"],ec="k",lw=.7,zorder=5))
     ax.add_patch(Polygon(P(rect(12,14.5,20,44.5)),fc=C["plate"],ec="k",lw=.7,zorder=5))
-    ax.add_patch(Polygon(P(rect(15,19,32.95,48.95)),fc=C["gear"],ec="k",lw=.7,zorder=5))        # worm wheel PD16
-    ax.plot(*P(np.array([[-24,40.95],[20.5,40.95]])).T,color="k",lw=.8,ls="-.",zorder=6)        # axle
-    mc=M@np.array([17,26.95]); ax.add_patch(Circle(mc,12.5,fc=C["motor"],ec="k",lw=1,ls="--",alpha=.75,zorder=4))
+    ax.add_patch(Polygon(P(rect(17,21,32.95,48.95)),fc=C["gear"],ec="k",lw=.7,zorder=5))        # worm wheel PD16
+    ax.plot(*P(np.array([[-24,40.95],[22.5,40.95]])).T,color="k",lw=.8,ls="-.",zorder=6)        # axle
+    mc=M@np.array([19,26.95]); ax.add_patch(Circle(mc,12.5,fc=C["motor"],ec="k",lw=1,ls="--",alpha=.75,zorder=4))
     ax.add_patch(Circle(mc,2,fc="k",zorder=6))
     for xr in (6,-6):
         ax.add_patch(Polygon(P(rect(xr-2,xr+2,3,34)),fc=C["rod"],ec="k",lw=.5,zorder=7))
@@ -49,8 +49,8 @@ dim(ax,(-50,-64.5),(50,-64.5),"몸체 외경 Ø100 (벽 2)",va="bottom");
 for x in (-50,50): ax.plot([x,x],[0,-66],color="k",lw=.4,ls=":")
 dim(ax,(-11.5,64),(11.5,64),"바퀴 폭 23"); 
 lab(ax,(8,56),(30,70),"옴니휠 Ø38.1")
-lab(ax,(17,26.95),(52,62),"모터 Ø25 (길이 방향으로 누움)\n바퀴 중심선에서 옆으로 17")
-lab(ax,(17,42),(60,48),"웜휠 (모듈 0.8, 20T 예시)")
+lab(ax,(19,26.95),(52,62),"모터 Ø25 (길이 방향으로 누움)\n바퀴 중심선에서 옆으로 19")
+lab(ax,(19,42),(60,48),"웜휠 (모듈 0.8, 20T 예시)")
 lab(ax,(-15,41),(-64,58),"허브 (3D 프린팅)\nM2×4, PCD 12",ha="right")
 lab(ax,(-21.2,36),(-70,44),"축 지지판",ha="right")
 lab(ax,(6,15),(-40,74),"가이드봉 Ø4 + 스프링 C202\n(바퀴당 2개)",ha="right")
@@ -58,7 +58,7 @@ lab(ax,(-6,25),(-66,70),"부싱 든 슬라이더",ha="right")
 lab(ax,(3,-2),(-72,2),"가운데 기둥\n바깥 Ø15 / 안 Ø8 (배선)",ha="right")
 lab(ax,(-12,-6),(-72,-14),"받침 블록 Ø29",ha="right")
 p=R(PI_A)@np.array([0,36]); lab(ax,p,(70,8),"Pi Zero 2 W\n(세워서, 폭 30×두께 5)")
-p0=R(240)@np.array([17,26.95]); lab(ax,p0,(52,-52),"모터끼리 간격 최소 25")
+p0=R(240)@np.array([19,26.95]); lab(ax,p0,(52,-52),"모터끼리 간격 최소 25")
 ax.text(0,-83,"점선 원 = 모터(바퀴 뒤쪽에 있어 단면에는 투영으로 표시)",ha="center",fontsize=9,color="#444")
 ax.set_xlim(-98,98); ax.set_ylim(-88,82)
 # ---------- side view ----------
@@ -121,8 +121,8 @@ t1=("■ 주요 치수\n"
 "· 바깥쪽 +2 (엘보 내경 123.8) → 약 4.5 N\n"
 "· 안쪽으로 3.4 더 들어감 (그 이상은 스프링 한계)")
 t2=("■ 간섭 확인 (계산값, 스프링 이동 범위 전체)\n"
-"· 모터 ↔ 몸체 안벽: 여유 1.9 이상\n"
-"· 모터 ↔ 받침 블록: 여유 2.0 이상\n"
+"· 모터 ↔ 몸체 안벽: 여유 0.9 이상\n"
+"· 모터 ↔ 받침 블록: 여유 3.3 이상\n"
 "· 모터 ↔ 모터: 여유 25 이상\n"
 "· 모터 ↔ 옆 유닛 가이드봉: 여유 8.4 이상\n"
 "· Pi Zero 2 W ↔ 주변: 여유 약 1.5~2.5 (빠듯함)\n"
