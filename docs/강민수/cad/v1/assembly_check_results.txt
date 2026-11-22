@@ -1,0 +1,27 @@
+Python: 3.11.9 CadQuery: 2.8.0
+slider solids: 1 valid: True size_mm: (56.098, 32.25, 96.0)
+hub solids: 1 valid: True size_mm: (8.0, 18.0, 18.0)
+sleeve solids: 1 valid: True size_mm: (8.0, 8.0, 14.0)
+spine solids: 1 valid: True size_mm: (95.2, 95.2, 124.0)
+shell solids: 1 valid: True size_mm: (100.0, 100.0, 124.0)
+front_cap solids: 1 valid: True size_mm: (100.0, 100.0, 5.5)
+rear_cap solids: 1 valid: True size_mm: (100.0, 100.0, 16.0)
+{"check": "front insertion; all units radial 2.0 mm", "samples": 71, "hits": []}
+{"check": "front cap insertion; all units radial 2.0 mm", "samples": 21, "hits": []}
+{"check": "rear cap insertion; all units radial 2.0 mm", "samples": 21, "hits": []}
+{"check": "final unit0; radial 2.0 mm", "samples": 1, "hits": []}
+{"check": "final unit1; radial 2.0 mm", "samples": 1, "hits": []}
+{"check": "final unit2; radial 2.0 mm", "samples": 1, "hits": []}
+{"check": "front insertion; all units radial 0.0 mm", "samples": 71, "hits": []}
+{"check": "front cap insertion; all units radial 0.0 mm", "samples": 21, "hits": []}
+{"check": "rear cap insertion; all units radial 0.0 mm", "samples": 21, "hits": []}
+{"check": "final unit0; radial 0.0 mm", "samples": 1, "hits": []}
+{"check": "final unit1; radial 0.0 mm", "samples": 1, "hits": []}
+{"check": "final unit2; radial 0.0 mm", "samples": 1, "hits": []}
+{"check": "front insertion; all units radial -3.4 mm", "samples": 71, "hits": []}
+{"check": "front cap insertion; all units radial -3.4 mm", "samples": 21, "hits": []}
+{"check": "rear cap insertion; all units radial -3.4 mm", "samples": 21, "hits": []}
+{"check": "final unit0; radial -3.4 mm", "samples": 1, "hits": []}
+{"check": "final unit1; radial -3.4 mm", "samples": 1, "hits": []}
+{"check": "final unit2; radial -3.4 mm", "samples": 1, "hits": []}
+{"check": "motor inserted axially from rear, isolated slider", "samples": 41, "hits": []}

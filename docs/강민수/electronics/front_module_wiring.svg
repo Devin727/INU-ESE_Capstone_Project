@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1900" viewBox="0 0 2400 1900">
+<rect width="100%" height="100%" fill="#f5f7fb"/>
+<text x="65" y="35" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="48" font-weight="700" fill="#17263b">앞 모듈 모터 구동 연결도  v0.2</text>
+<text x="65" y="101" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="28" font-weight="400" fill="#17263b">FIT0522 ×3 (앞 모듈)  ·  MDD3A ×2 · ESP32 DevKitC / WROOM-32D (뒤 마디, 기구 v2)  ·  모터선 6가닥 ×3이 관절 통과</text>
+<text x="65" y="145" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#9c650d">2026-11-23 (연결 내용은 2026-11-19 초안과 같음)  |  모듈 단위 배선 초안 · GPIO 제안 · 실물 미검증 · 커넥터 물리 순서 아님</text>
+<rect x="65" y="205" width="2270" height="185" rx="14" fill="white" stroke="#c33e48" stroke-width="3"/>
+<text x="87" y="223" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="29" font-weight="700" fill="#c33e48">J_PWR  외부 / 뒤마디에서 공급 — 전원부 모델·퓨즈·전선 굵기 미정</text>
+<polyline points="83,270 2317,270" fill="none" stroke="#dce3ed" stroke-width="2"/>
+<text x="90" y="286" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="29" font-weight="700" fill="#c33e48">+6V_MOTOR → U2·U3 VB+     |     +5V_LOGIC → U1 5V     |     GND → 전체 공통</text>
+<text x="90" y="338" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">모터 전원 예산 [계산]: 최대출력점 합 3 A / 동시 스톨 합 9 A.  2S 배터리 원전압을 모터에 직접 연결하지 않음.</text>
+<rect x="65" y="430" width="680" height="930" rx="14" fill="white" stroke="#2463b7" stroke-width="3"/>
+<text x="87" y="448" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="29" font-weight="700" fill="#2463b7">U1  ESP32 DevKitC / WROOM-32D</text>
+<polyline points="83,495 727,495" fill="none" stroke="#dce3ed" stroke-width="2"/>
+<text x="90" y="510" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="400" fill="#c33e48">5V ← +5V_LOGIC    GND ↔ 공통 GND</text>
+<text x="90" y="553" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#c33e48">3V3 → 엔코더 VCC ×3 (전류 합 확인 필요)</text>
+<text x="90" y="610" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="700" fill="#2463b7">모터 제어 출력 [GPIO 제안]</text>
+<text x="93" y="655" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">GPIO25 → DRV1_A → U2 IN M1A</text>
+<text x="93" y="694" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">GPIO26 → DRV1_B → U2 IN M1B</text>
+<text x="93" y="733" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">GPIO27 → DRV2_A → U2 IN M2A</text>
+<text x="93" y="772" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">GPIO14 → DRV2_B → U2 IN M2B</text>
+<text x="93" y="811" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">GPIO32 → DRV3_A → U3 IN M1A</text>
+<text x="93" y="850" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">GPIO33 → DRV3_B → U3 IN M1B</text>
+<text x="90" y="918" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="700" fill="#16806d">엔코더 입력 [GPIO 제안]</text>
+<text x="93" y="963" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="400" fill="#16806d">ENC1_A / B → GPIO34 / 35</text>
+<text x="93" y="1003" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="400" fill="#16806d">ENC2_A / B → GPIO36 / 39</text>
+<text x="93" y="1043" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="400" fill="#16806d">ENC3_A / B → GPIO18 / 19</text>
+<text x="90" y="1110" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="400" fill="#9c650d">ToF 예비: SDA21 / SCL22</text>
+<text x="90" y="1150" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#9c650d">선택 제어선 예비: GPIO13 / GPIO23</text>
+<text x="90" y="1210" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">상위 통신 예비 [가정]: TX17 / RX16</text>
+<text x="90" y="1250" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#17263b">3.3 V UART · 상대 RX/TX 교차 · GND 공통</text>
+<text x="90" y="1300" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="700" fill="#c33e48">USB 전원과 외부 5V는 동시 공급 금지</text>
+<rect x="1010" y="430" width="610" height="415" rx="14" fill="white" stroke="#2463b7" stroke-width="3"/>
+<text x="1032" y="448" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="29" font-weight="700" fill="#2463b7">U2  MDD3A #1 — 모터 1·2</text>
+<polyline points="1028,495 1602,495" fill="none" stroke="#dce3ed" stroke-width="2"/>
+<text x="1035" y="512" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#c33e48">VB+ ← +6V_MOTOR   VB- / GND → GND</text>
+<text x="1035" y="560" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#2463b7">IN M1A ← DRV1_A</text>
+<text x="1035" y="598" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#2463b7">IN M1B ← DRV1_B</text>
+<text x="1035" y="636" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#2463b7">IN M2A ← DRV2_A</text>
+<text x="1035" y="674" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#2463b7">IN M2B ← DRV2_B</text>
+<text x="1035" y="728" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="400" fill="#17263b">OUT CH1 A/B → M1 핀 6 / 1</text>
+<text x="1035" y="767" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="400" fill="#17263b">OUT CH2 A/B → M2 핀 6 / 1</text>
+<text x="1035" y="805" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#9c650d">5VO: 미연결 (200 mA 출력)</text>
+<rect x="1010" y="895" width="610" height="340" rx="14" fill="white" stroke="#2463b7" stroke-width="3"/>
+<text x="1032" y="913" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="29" font-weight="700" fill="#2463b7">U3  MDD3A #2 — 모터 3</text>
+<polyline points="1028,960 1602,960" fill="none" stroke="#dce3ed" stroke-width="2"/>
+<text x="1035" y="975" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#c33e48">VB+ ← +6V_MOTOR   VB- / GND → GND</text>
+<text x="1035" y="1020" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#2463b7">IN M1A / M1B ← DRV3_A / DRV3_B</text>
+<text x="1035" y="1065" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="400" fill="#17263b">OUT CH1 A/B → M3 핀 6 / 1</text>
+<text x="1035" y="1110" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="400" fill="#17263b">미사용 IN M2A / M2B → 각각 10 kΩ → GND</text>
+<text x="1035" y="1152" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="400" fill="#17263b">미사용 OUT CH2: 개방 · 다른 출력과 병렬 금지</text>
+<text x="1035" y="1193" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#9c650d">5VO: 미연결</text>
+<rect x="1850" y="430" width="485" height="240" rx="14" fill="white" stroke="#16806d" stroke-width="3"/>
+<text x="1872" y="448" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="29" font-weight="700" fill="#16806d">M1  FIT0522 + 엔코더</text>
+<polyline points="1868,495 2317,495" fill="none" stroke="#dce3ed" stroke-width="2"/>
+<text x="1870" y="511" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#17263b">핀6 / 핀1 ← U2 OUT CH1 A/B</text>
+<text x="1870" y="553" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#c33e48">핀5 VCC ← 3V3   핀2 GND → GND</text>
+<text x="1870" y="595" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#16806d">핀3 / 핀4 → ENC1_A / ENC1_B</text>
+<text x="1870" y="634" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="21" font-weight="400" fill="#c33e48">핀1은 모터선! 공통 GND에 직결하지 않음</text>
+<rect x="1850" y="710" width="485" height="240" rx="14" fill="white" stroke="#16806d" stroke-width="3"/>
+<text x="1872" y="728" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="29" font-weight="700" fill="#16806d">M2  FIT0522 + 엔코더</text>
+<polyline points="1868,775 2317,775" fill="none" stroke="#dce3ed" stroke-width="2"/>
+<text x="1870" y="791" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#17263b">핀6 / 핀1 ← U2 OUT CH2 A/B</text>
+<text x="1870" y="833" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#c33e48">핀5 VCC ← 3V3   핀2 GND → GND</text>
+<text x="1870" y="875" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#16806d">핀3 / 핀4 → ENC2_A / ENC2_B</text>
+<text x="1870" y="914" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="21" font-weight="400" fill="#c33e48">핀1은 모터선! 공통 GND에 직결하지 않음</text>
+<rect x="1850" y="990" width="485" height="240" rx="14" fill="white" stroke="#16806d" stroke-width="3"/>
+<text x="1872" y="1008" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="29" font-weight="700" fill="#16806d">M3  FIT0522 + 엔코더</text>
+<polyline points="1868,1055 2317,1055" fill="none" stroke="#dce3ed" stroke-width="2"/>
+<text x="1870" y="1071" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#17263b">핀6 / 핀1 ← U3 OUT CH1 A/B</text>
+<text x="1870" y="1113" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#c33e48">핀5 VCC ← 3V3   핀2 GND → GND</text>
+<text x="1870" y="1155" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#16806d">핀3 / 핀4 → ENC3_A / ENC3_B</text>
+<text x="1870" y="1194" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="21" font-weight="400" fill="#c33e48">핀1은 모터선! 공통 GND에 직결하지 않음</text>
+<polyline points="1620,748 1730,748 1730,550 1850,550" fill="none" stroke="#2463b7" stroke-width="4"/>
+<polyline points="1620,787 1690,787 1690,830 1850,830" fill="none" stroke="#2463b7" stroke-width="4"/>
+<polyline points="1620,1084 1730,1084 1730,1110 1850,1110" fill="none" stroke="#2463b7" stroke-width="4"/>
+<text x="1660" y="465" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="21" font-weight="400" fill="#2463b7">모터선 2가닥씩</text>
+<polyline points="745,735 870,735 870,620 1010,620" fill="none" stroke="#2463b7" stroke-width="4"/>
+<text x="770" y="655" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#2463b7">DRV1/2</text>
+<polyline points="745,850 825,850 825,1035 1010,1035" fill="none" stroke="#2463b7" stroke-width="4"/>
+<text x="840" y="992" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#2463b7">DRV3</text>
+<rect x="1010" y="1280" width="1325" height="245" rx="14" fill="#fffaf0" stroke="#9c650d" stroke-width="3"/>
+<text x="1032" y="1298" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="29" font-weight="700" fill="#9c650d">ToF 예비 연결 — 부품 미선정 / 현재 장착하지 않음</text>
+<polyline points="1028,1345 2317,1345" fill="none" stroke="#dce3ed" stroke-width="2"/>
+<text x="1035" y="1360" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="400" fill="#17263b">I²C형을 택할 경우 [가정]: SDA ↔ GPIO21 / SCL ↔ GPIO22 / GND 공통</text>
+<text x="1035" y="1407" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#9c650d">V_TOF는 미연결 유지. 구매 보드의 전원·논리 전압·단자 순서 확인 후 결정.</text>
+<text x="1035" y="1454" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">XSHUT / INT는 선택 예약. 풀업은 보드 내장 여부 확인 후 3.3 V 기준으로 구성.</text>
+<polyline points="745,1130 905,1130 905,1405 1010,1405" fill="none" stroke="#9c650d" stroke-width="3" stroke-dasharray="9 9"/>
+<rect x="65" y="1410" width="680" height="390" rx="14" fill="#fff7f7" stroke="#c33e48" stroke-width="3"/>
+<text x="87" y="1428" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="29" font-weight="700" fill="#c33e48">정지 동작 / 기존 코드와 차이</text>
+<polyline points="83,1475 727,1475" fill="none" stroke="#dce3ed" stroke-width="2"/>
+<text x="90" y="1495" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">MDD3A: A=0, B=0 → 브레이크</text>
+<text x="90" y="1538" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">A=PWM, B=0 / A=0, B=PWM → 정·역</text>
+<text x="90" y="1581" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">A=1, B=1 → 브레이크</text>
+<text x="90" y="1624" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">기존 DRV8833 코드의 00=Coast와 다름.</text>
+<text x="90" y="1667" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">MDD3A에는 nSLEEP 단자가 없음.</text>
+<text x="90" y="1710" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">핀 설정·정지 의미 수정 전 실물 구동 금지.</text>
+<rect x="790" y="1570" width="1545" height="230" rx="14" fill="white" stroke="#17263b" stroke-width="3"/>
+<text x="812" y="1588" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="29" font-weight="700" fill="#17263b">추가 수동 부품 [제안값 / 미구매·미검증]</text>
+<polyline points="808,1635 2317,1635" fill="none" stroke="#dce3ed" stroke-width="2"/>
+<text x="815" y="1650" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="400" fill="#17263b">각 제어 입력 → 10 kΩ → GND (활성 6개 + 미사용 2개, 합 8개)</text>
+<text x="815" y="1694" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#17263b">각 드라이버 VB+ ↔ GND: 470 µF / 16 V + 100 nF 병렬. 각 모터 핀6 ↔ 핀1: 100 nF.</text>
+<text x="815" y="1738" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#16806d">엔코더 A/B 풀업: 출력 회로 확인 전 DNP. 필요 시 4.7 kΩ → 3V3 (6개).</text>
+<text x="65" y="1835" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="400" fill="#17263b">공통 GND: 모터 전류 귀환은 전원 분배점으로 직접. ESP32·엔코더 접지 배선을 모터 전류 경로로 쓰지 않음.</text>
+</svg>

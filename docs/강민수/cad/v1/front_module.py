@@ -9,8 +9,12 @@ import cadquery as cq
 R_PIPE=60.0; R_OUT=50.0; R_IN=48.0
 WHEEL_R=19.05; WHEEL_W=23.0; AX_Y=R_PIPE-WHEEL_R          # 바퀴 축 높이 40.95
 CD=14.0; MX=19.0; MY=AX_Y-CD                               # 웜 축간 거리(가정), 모터 축 위치
-M_R=12.5; M_FACE=-23.0; M_LEN=61.0                         # FIT0521
+M_FACE=-23.0                                                # motor mounting face
 ROD_R=2.0; BUSH_R=3.55                                     # 가이드봉 Ø4, 부싱 바깥 Ø7(가정)+여유
+BRG_R=3.55; BRG_WALL=1.5                                   # 바퀴·웜 축 베어링 MF74ZZ(4×7×2.5, 플랜지 Ø8.2×0.6 [판매 일반 규격]) 구멍, 둘레 벽
+BRG_FL_R=4.1; BRG_FL_T=0.6
+M_SCREW=(16.0,18.0)                                        # 모터 M3 2개 중심 간격 범위 → 긴 구멍. 17은 같은 계열(JGA25-370) 판매 사양 [미확인]
+SLV_Z0=-20.0                                               # 슬리브 뒤끝. FIT0522 돌출부(장착면 +2.5 = −20.5)에서 0.5 띄움
 SEAT_Y=9.0; EAR_Y0=21.5; EAR_Y1=29.5                       # 스프링 받침면, 슬라이더 귀
 Z_FRONT=34.0; FL_Z0=-87.5; FL_Z1=-85.0                     # 몸체 앞끝, 뒤 플랜지
 Z_SHELL0=-90.0; Z_CAP0=-106.0
@@ -38,13 +42,16 @@ def slider():
     # 모터 뒤 받침: 팔 + C형 고리. 몸체 벽 쪽(바깥)은 여유가 없어 열어 둠 (약 247도 감쌈)
     ring=cylz(CR_RO,CR_Z0,CR_Z1,MX,MY).cut(box(7,20,-20,20,CR_Z0-1,CR_Z1+1).rotate((0,0,0),(0,0,1),math.degrees(math.atan2(MY,MX))).translate((MX,MY,0)))
     s=s.union(box(1.5,6.2,18.5,EAR_Y1,CR_Z0,M_FACE)).union(ring).cut(cylz(CR_RI,CR_Z0-1,M_FACE,MX,MY))
+    br=BRG_R+BRG_WALL; s=s.union(cylx(br,-22.5,-20,AX_Y,0)).union(cylx(br,12,14.5,AX_Y,0))   # 베어링 둘레 벽 (위쪽 0 → 1.5)
     s=s.cut(box(11.9,MX+8,15,34.3,-7.5,7.5))                                # 웜 자리
     s=s.cut(cylx(20,-12,12,AX_Y,0))                                      # 바퀴 자리
-    s=s.cut(cylx(BUSH_R,-23,-19,AX_Y,0)).cut(cylx(BUSH_R,11,15,AX_Y,0))  # 축 베어링 4x7
-    s=s.cut(cylz(BUSH_R,7,11,MX,MY))                                     # 웜 축 베어링 4x7
+    s=s.cut(cylx(BRG_R,-23,-19,AX_Y,0)).cut(cylx(BRG_R,11,15,AX_Y,0))    # 바퀴 축 베어링 MF74ZZ, 플랜지는 바깥면
+    s=s.cut(cylz(BRG_R,7,11,MX,MY))                                      # 웜 축 베어링 4x7
     s=s.cut(cyly(BUSH_R,EAR_Y0-1,EAR_Y1+1,6,25)).cut(cyly(BUSH_R,EAR_Y0-1,EAR_Y1+1,-6,-25))   # 부싱
     s=s.cut(cylz(4.5,M_FACE-1,-19,MX,MY))                                # 모터 축 구멍
-    for dx in (-8.5,8.5): s=s.cut(cylz(1.65,M_FACE-1,-19,MX+dx,MY))      # 모터 M3 x2, 간격 17 (가정)
+    for sx in (-1,1):                                                    # 모터 M3 x2, 간격 16~18 긴 구멍
+        x0,x1=sorted((MX+sx*M_SCREW[0]/2,MX+sx*M_SCREW[1]/2))
+        s=s.cut(cylz(1.65,M_FACE-1,-19,x0,MY)).cut(cylz(1.65,M_FACE-1,-19,x1,MY)).cut(box(x0,x1,MY-1.65,MY+1.65,M_FACE-1,-19))
     return s
 def hub():
     h=cylx(9,-14.5,-11.5,AX_Y,0).union(cylx(5,-19.5,-14.5,AX_Y,0)).cut(cylx(2.05,-20,-11,AX_Y,0))
@@ -52,7 +59,7 @@ def hub():
         a=math.radians(45+90*i); h=h.cut(cylx(1.1,-15,-11,AX_Y+6*math.cos(a),6*math.sin(a)))
     return h.cut(cyly(1.3,AX_Y,AX_Y+6,-17,0))                            # M3 고정 나사
 def sleeve():
-    s=cylz(4,-21,-7,MX,MY).cut(cylz(2.05,-22,-6,MX,MY))
+    s=cylz(4,SLV_Z0,-7,MX,MY).cut(cylz(2.05,SLV_Z0-1,-6,MX,MY))
     for z in (-17.5,-10): s=s.cut(cyly(1.3,MY,MY+5,MX,z))
     return s
 def spine():
@@ -91,12 +98,25 @@ def rear_cap():
     return s
 
 # ---------------- 구매품 (간섭 확인·조립도용) ----------------
+def fit0522():
+    """FIT0522 drawing envelope at local mounting face z=0, without harness."""
+    gearbox = cylz(12.5, -23, 0)
+    can = cylz(12.2, -54, -23)
+    encoder = cylz(7, -63, -54)  # simplified rear envelope, 40 REF from gearbox
+    boss = cylz(3.5, 0, 2.5)
+    shaft = cylz(2, 2.5, 14.5).cut(box(1.5, 3, -3, 3, 4.5, 15))
+    return gearbox.union(can).union(encoder).union(boss).union(shaft)
+
 def bought_moving():
     w=cylx(WHEEL_R,-WHEEL_W/2,WHEEL_W/2,AX_Y,0)
     g=cylx(8.8,MX-2,MX+2,AX_Y,0); wm=cylz(6.8,-5,5,MX,MY)
     ax=cylx(2,-23.5,MX+2.5,AX_Y,0); ws=cylz(2,-11,10.5,MX,MY)
-    m=cylz(M_R,M_FACE-M_LEN,M_FACE,MX,MY).union(cylz(2,M_FACE,M_FACE+12,MX,MY))
-    return dict(wheel=w,gear=g,worm=wm,axle=ax,wormshaft=ws,motor=m)
+    m=fit0522().translate((MX,MY,M_FACE))
+    b=None
+    for x0,x1,f0,f1 in ((-22.5,-20,-22.5-BRG_FL_T,-22.5),(12,14.5,14.5,14.5+BRG_FL_T)):     # MF74ZZ x2, 플랜지 바깥
+        r=cylx(3.5,x0,x1,AX_Y,0).union(cylx(BRG_FL_R,f0,f1,AX_Y,0)).cut(cylx(2,x0-1,x1+1,AX_Y,0))
+        b=r if b is None else b.union(r)
+    return dict(wheel=w,gear=g,worm=wm,axle=ax,wormshaft=ws,motor=m,bearing=b)
 def bought_fixed():
     d={}
     rods=None; springs=None
@@ -125,7 +145,7 @@ if __name__=="__main__":
     # 유닛 내부 (부품끼리)
     for a,b in itertools.combinations(mv,2):
         v=vol(mv[a],mv[b])
-        if v>0.5 and {a,b} not in ({"axle","wheel"},{"axle","gear"},{"axle","hub"},{"worm","wormshaft"},{"sleeve","wormshaft"},{"sleeve","motor"},{"gear","worm"}): bad.append((f"unit:{a}",b,round(v,1)))
+        if v>0.5 and {a,b} not in ({"axle","wheel"},{"axle","gear"},{"axle","hub"},{"worm","wormshaft"},{"gear","worm"}): bad.append((f"unit:{a}",b,round(v,1)))
     for d in TRAVEL:
         u0=unit(0,d,mv)
         for n,p in u0.items():
@@ -146,7 +166,7 @@ if __name__=="__main__":
         cq.exporters.export(p,f"{out}/{n}.stl",tolerance=0.02,angularTolerance=0.15); cq.exporters.export(p,f"{out}/{n}.step")
         bb=p.val().BoundingBox(); print(f"{n}: {bb.xlen:.1f} x {bb.ylen:.1f} x {bb.zlen:.1f} mm, {p.val().Volume()/1000:.1f} cm3")
     asm=cq.Assembly(name="front_module")
-    col=dict(slider="lightskyblue",hub="khaki",sleeve="khaki",wheel="royalblue",gear="goldenrod",worm="goldenrod",axle="gray40",wormshaft="gray40",motor="gray70",
+    col=dict(slider="lightskyblue",hub="khaki",sleeve="khaki",wheel="royalblue",gear="goldenrod",worm="goldenrod",axle="gray40",wormshaft="gray40",motor="gray70",bearing="gray50",
              spine="slategray",shell="gray85",front_cap="gray85",rear_cap="gray85",rods="gray30",mdd3a="indianred",esp32="mediumpurple")
     for n,p in fx.items(): asm.add(p,name=n,color=cq.Color(col[n]))
     for k in range(3):
