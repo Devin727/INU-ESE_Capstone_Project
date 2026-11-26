@@ -2,6 +2,7 @@
 
 실행: python 앞모듈_v2_검토.py            → ../cad/v2/elbow_results.txt, 2026-11-23-앞모듈_v2_엘보_계산.png  (cadquery 필요, 10분 이상)
       python 앞모듈_v2_검토.py --round-wheel → 둥근 바퀴 진단 결과를 elbow_results.txt 끝에 덧붙임
+      python 앞모듈_v2_검토.py --closed-shell → 모터까지 덮는 닫힌 삼각 외피 진단 결과를 elbow_results.txt 끝에 덧붙임
 방법:
 - ../cad/v2/front_module_v2.py 의 실제 부품 형상(고정부 + 유닛 3개)을 삼각형으로 나눠 표면 점을 뽑는다.
   (z 2 mm × 축 둘레 5° 칸마다 가장 바깥 점만 남김)
@@ -107,7 +108,7 @@ def draw(path, clouds, results):
     ax = fig.add_axes([.03, .02, .94, .25]); ax.axis("off")
     lines = ["■ 결과 (모든 롤 각 0~105°, 축 각도 0~90°에서 들어가는 위치가 있으면 통과)"] + ["  " + r for r in results] + [
         "", "점 = 부품 표면의 가장 바깥 점(굽힘 평면에 투영). 바퀴는 Ø38.1 × 23 원통으로 봄. 정적 형상 검사이며 실물 엘보 시험으로 확인해야 함.",
-        f"치수: cad/v2/front_module_v2.py (길이 {F.Z_FRONT - F.Z_REAR:.1f}, 덮개 Ø{2 * F.COV_RO:.0f}, 긴 봉 끝 r {F.ROD_TOP:.0f}, 짧은 봉 끝 r {SHORT_ROD:.0f})"]
+        f"치수: cad/v2/front_module_v2.py (길이 {F.Z_FRONT - F.Z_REAR:.1f}, 삼각 외피 최대 반지름 {F.TRI_RV:.0f}, 긴 봉 끝 r {F.ROD_TOP:.0f}, 짧은 봉 끝 r {SHORT_ROD:.0f})"]
     ax.text(0, 1, "\n".join(lines), va="top", fontsize=10.5)
     fig.savefig(path, bbox_inches="tight"); print("saved", path)
 
@@ -125,11 +126,27 @@ def round_wheel_diag(out_txt):
         out.append(f"[진단] 둥근 바퀴 | {en}: " + ("통과" if ok else f"불통과 (롤 {where[0]}°, 축 각도 {where[1]}°에서 막힘)")); print(out[-1], flush=True)
     with open(out_txt, "a", encoding="utf-8") as f: f.write("\n".join(out) + "\n")
 
+CLOSED = ((30.0, 54.1, 58.0), (20.0, 52.0, 57.0))   # (법선 각, 평면 거리, 둥근 부분 반지름). 내경 120 설정에서 모터·지지판이 닿지 않는 거리 + 여유 1 + 벽 1.5 [계산]
+def closed_shell_diag(out_txt):
+    """진단: 덮개를 창 없는 닫힌 삼각 외피(모터까지 안에 넣는 크기)로 바꿔 내경 120 엘보만 계산해 결과 파일 끝에 덧붙인다.
+    viewer.html 처럼 세 변을 평면으로 닫는 외피가 v2 속구조에서 가능한지 보려는 것."""
+    orig = F.PRINT["cover"]; out = []
+    for psi, d, rv in CLOSED:
+        F.PRINT["cover"] = lambda: F.tri_prism(d, rv, F.Z_REAR, F.Z_FRONT, psi).cut(F.tri_prism(d - 1.5, rv - 1.5, F.Z_REAR - 1, F.Z_FRONT + 1, psi))
+        name, dd, rod, _ = CASES[0]; pts = robot_cloud(dd, rod)
+        for i in (0, 1):
+            en, D, Rc, model = ELBOWS[i]; ok, where = passes(pts, D, Rc, model)
+            out.append(f"[진단] 닫힌 삼각 외피 (법선 {psi:.0f}°, 평면 거리 {d}, 둥근 부분 {rv}), 내경 120 설정 | {en}: " + ("통과" if ok else f"불통과 (롤 {where[0]}°, 축 각도 {where[1]}°에서 막힘)")); print(out[-1], flush=True)
+    F.PRINT["cover"] = orig
+    with open(out_txt, "a", encoding="utf-8") as f: f.write("\n".join(out) + "\n")
+
 if __name__ == "__main__":
     out_txt = HERE.parent / "cad" / "v2" / "elbow_results.txt"
     if "--round-wheel" in sys.argv:
         round_wheel_diag(out_txt); sys.exit(0)
-    lines = [f"모듈 길이 {F.Z_FRONT - F.Z_REAR:.1f}, 덮개 Ø{2 * F.COV_RO:.0f}, 가이드봉 끝 반지름 {F.ROD_TOP:.0f} (짧은 봉 {SHORT_ROD:.0f})",
+    if "--closed-shell" in sys.argv:
+        closed_shell_diag(out_txt); sys.exit(0)
+    lines = [f"모듈 길이 {F.Z_FRONT - F.Z_REAR:.1f}, 삼각 외피 (평면 거리 {F.TRI_D:g}, 최대 반지름 {F.TRI_RV:g}), 가이드봉 끝 반지름 {F.ROD_TOP:.0f} (짧은 봉 {SHORT_ROD:.0f})",
              f"롤 {len(ROLLS)}개 (0~105°, 15° 간격) × 축 각도 {len(THETAS)}개 (0~90°, 3° 간격), 위치 격자 1 mm"]
     clouds, results = [], []
     for name, d, rod, idx in CASES:

@@ -57,4 +57,4 @@ if __name__ == "__main__":
     unit += [(P["spacer"].translate((0, 0, gz - F.GUIDE_Z[0])), COL["spacer"], 1) for gz in F.GUIDE_Z]
     render(unit, OUT / "유닛.png", "바퀴 유닛 1개 (가이드봉·스페이서 포함)", elev=18, azim=-35)
     render([(P["slider"], COL["slider"], 1)], OUT / "슬라이더.png", "슬라이더 (출력 부품)", elev=25, azim=-40)
-    render([(P["cover"], COL["petal"], 1)], OUT / "덮개.png", "덮개 (한 덩어리)", elev=15, azim=-70)
+    render([(P["cover"], COL["petal"], 1)], OUT / "덮개.png", "덮개 — 삼각 외피 (한 덩어리)", elev=15, azim=-70)

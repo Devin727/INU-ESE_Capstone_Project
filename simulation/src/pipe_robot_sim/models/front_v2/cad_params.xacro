@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<!-- 자동 생성: docs/강민수/cad/v2/urdf_export.py (2026-11-26). 직접 고치지 말고 CAD 를 고친 뒤 다시 만들 것.
+     단위 m, kg, rad. 좌표는 URDF (x 앞, z 위 = 유닛 0 바퀴 쪽). 질량·관성은 추정 (출력 부품 속 100 %, 나사·스프링·전선·보드 제외).
+     몸체 155 g, 유닛(슬라이더 + 모터) 117 g × 3, 바퀴 축 뭉치 35 g × 3, 합 612 g -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:property name="cad_wheel_r" value="0.01905"/>   <!-- 바퀴 반지름 (Ø38.1) [도면] -->
+  <xacro:property name="cad_wheel_w" value="0.02300"/>   <!-- 바퀴 폭 [도면] -->
+  <xacro:property name="cad_axle_h" value="0.04095"/>   <!-- 변위 0 일 때 바퀴 축 높이 (내경 120 접촉) -->
+  <xacro:property name="cad_d_min" value="-0.01200"/>   <!-- 기구 행정 아래 끝 -->
+  <xacro:property name="cad_d_max" value="0.00300"/>   <!-- 기구 행정 위 끝 -->
+  <xacro:property name="cad_spring_k" value="2820"/>   <!-- 바퀴당 스프링 상수 N/m (C202 2개) [계산] -->
+  <xacro:property name="cad_spring_gap0" value="0.02100"/>   <!-- 변위 0, 스페이서 없을 때 스프링 길이 (받침 ~ 귀 아랫면) -->
+  <xacro:property name="cad_spring_free" value="0.01600"/>   <!-- C202 자유 길이 [판매] -->
+  <xacro:property name="cad_spring_min" value="0.00909"/>   <!-- C202 최소 길이 [판매] -->
+  <xacro:property name="cad_spacer" value="0.00900"/>   <!-- 스페이서 (내경 120 설정) -->
+  <xacro:property name="cad_x_rear" value="-0.08550"/>   <!-- 뒷판 뒷면 -->
+  <xacro:property name="cad_x_front" value="0.02300"/>   <!-- 앞판 앞면 -->
+  <xacro:property name="cad_plate_r" value="0.03700"/>   <!-- 앞·뒷판 반지름 -->
+  <xacro:property name="cad_tri_d" value="0.03950"/>   <!-- 삼각 외피 평면까지 거리 -->
+  <xacro:property name="cad_tri_rv" value="0.04700"/>   <!-- 삼각 외피 꼭짓점 반지름 -->
+  <xacro:property name="cad_tri_vtx" value="0.20944"/>   <!-- 꼭짓점 방향 rad (+120° 간격) -->
+  <xacro:property name="cad_rod_top" value="0.04700"/>   <!-- 가이드봉 끝 반지름 (긴 봉) -->
+  <xacro:property name="cad_rod_top_short" value="0.03700"/>   <!-- 가이드봉 끝 반지름 (짧은 봉) -->
+  <xacro:property name="cad_rod_x0" value="-0.02600"/>   <!-- 가이드봉 위치 (앞) -->
+  <xacro:property name="cad_rod_x1" value="-0.04100"/>   <!-- 가이드봉 위치 (뒤) -->
+  <xacro:property name="cad_motor_y" value="0.02500"/>   <!-- 모터 축 옆 오프셋 -->
+  <xacro:property name="cad_motor_z" value="0.02695"/>   <!-- 모터 축 높이 (변위 0) -->
+  <xacro:property name="cad_motor_r" value="0.01250"/>   <!-- 모터 반지름 [도면] -->
+  <xacro:property name="cad_motor_x0" value="-0.07250"/>   <!-- 모터 뒤끝 (엔코더) -->
+  <xacro:property name="cad_motor_x1" value="-0.00950"/>   <!-- 모터 장착면 -->
+  <xacro:property name="cad_gear_ratio" value="16"/>   <!-- 웜 감속비 1:n -->
+  <xacro:property name="cad_mass_total" value="0.6117"/>   <!-- 몸체 + 유닛 3 + 바퀴 3 (kg, 추정) -->
+  <xacro:macro name="cad_inertial_body">
+    <inertial>
+      <origin xyz="-0.031730 -0.000000 0.000000" rpy="0 0 0"/>
+      <mass value="0.15526"/>
+      <inertia ixx="1.9256e-04" ixy="1.1343e-10" ixz="-1.3074e-09" iyy="2.9276e-04" iyz="3.6641e-10" izz="2.9276e-04"/>
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="cad_inertial_unit">
+    <inertial>
+      <origin xyz="-0.035347 0.022427 0.028643" rpy="0 0 0"/>
+      <mass value="0.11670"/>
+      <inertia ixx="1.5555e-05" ixy="1.0209e-06" ixz="-1.9862e-06" iyy="4.0522e-05" iyz="2.2886e-06" izz="4.5016e-05"/>
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="cad_inertial_wheel">
+    <inertial>
+      <origin xyz="0.000004 0.001198 -0.000004" rpy="0 0 0"/>
+      <mass value="0.03544"/>
+      <inertia ixx="6.0457e-06" ixy="-3.1620e-09" ixz="-3.2041e-10" iyy="5.1734e-06" iyz="4.4935e-10" izz="6.0455e-06"/>
+    </inertial>
+  </xacro:macro>
+
+</robot>

@@ -1,4 +1,5 @@
 """앞 모듈 v2 CAD — 내경 120 시연 기준(C202 + 스페이서 9), 내경 100~120 호환 구조. 단위 mm.
+덮개: 2026-11-24부터 삼각 외피(cover). 이전 원통 덮개는 cover_round 로 남겨 두고 STL·STEP만 함께 낸다.
 
 좌표: Z = 배관 길이 방향(앞이 +). 유닛 좌표 x = 접선, y = 반지름. 유닛 k 는 Z 축으로 120k 도 회전.
 배치 근거: ../../2026-11-20-앞모듈_v2_호환_검토.md, 그림: ../../figures/2026-11-21-앞모듈_배치도_v2.png
@@ -23,7 +24,7 @@ Z_GB, Z_CAN, Z_ENC = M_FACE - 23, M_FACE - 54, M_FACE - 63    # FIT0522 [도면]
 PLUG = 10.0                                                   # 엔코더 뒤 플러그·전선 공간 [가정]
 Z_FRONT = 23.0; FC_T = 3.0                                    # 앞판 z 20~23 (바퀴 앞끝 19.05와 0.95 띄움)
 Z_REAR = Z_ENC - PLUG - 3.0                                   # 뒷판 뒷면 -85.5
-PLATE_R = 37.0; COV_RI, COV_RO = 37.0, 39.0                   # 앞·뒷판 Ø74, 덮개 Ø78 (두께 2)
+PLATE_R = 37.0; COV_RI, COV_RO = 37.0, 39.0                   # 앞·뒷판 Ø74, 이전 원통 덮개 Ø78 (두께 2)
 GUIDE_Z = (-26.0, -41.0); SEAT_Y = 9.0; SPACER = 9.0          # 가이드봉 z, 스프링 받침, 스페이서(내경 120 설정)
 ROD_Y0, ROD_TOP = 4.5, 47.0                                   # 가이드봉 Ø4 반지름 4.5~47 (길이 42.5), 끝 스토퍼 2
 EAR_OFF, EAR_H = 10.95, 12.0                                  # 귀 아랫면 = 축 높이 - 10.95, 귀 높이 = LM4UU 길이 12
@@ -37,7 +38,19 @@ D_MIN, D_MAX = -12.0, 3.0                                     # 기구 행정 (�
 D_JOINT = 61.9 - WR - A0                                      # 내경 123.8 이음부 1.9
 D_CHECK = (D_MIN, -10.0, D_SOLID, 0.0, D_JOINT, D_MAX)
 AXLE_X1 = 31.6                                                # 바퀴 축 끝 (x -19.5 ~ 31.6, 길이 약 51)
-COV_RI_IN = 35.0                                              # 덮개 안쪽 보강: 부품이 지나지 않는 곳은 반지름 35까지 채움 (두께 4)
+COV_RI_IN = 35.0                                              # 원통 덮개 안쪽 보강: 부품이 지나지 않는 곳은 반지름 35까지 채움 (두께 4)
+TRI_PSI = 72.0                                                # 삼각 외피 평면의 법선 각 (deg). 유닛 0 바퀴 방향 = 90°, 그 모터 쪽 = 0° 방향
+TRI_VTX = TRI_PSI - 60                                        # 꼭짓점 방향 12° = 유닛 사이 빈 자리 (레일이 서는 곳)
+TRI_D, TRI_RV, TRI_T = 39.5, 47.0, 3.0                        # 평면까지 거리, 꼭짓점 둥근 부분 반지름, 벽 두께
+TRI_EDGE = 1.5; WIN_R = 3.0                                   # 레일의 모터 쪽 가장자리 최소 두께, 창 모서리 둥글림
+WIN_X0, WIN_X1 = -19.5 - 1.0, MX + 14.75 + 1.0                # 창 폭: 허브·축 끝 ~ 모터 받침(반지름 14.75), 여유 1씩 (-20.5 ~ 40.75)
+WIN_ZR = Z_ENC - PLUG - 1.0                                   # 창 뒤끝 = 플러그 끝 + 여유 1 (-83.5)
+WIN_ZE = GUIDE_Z[1] - EAR_W - 1.0                             # 가운데 창 뒤끝 = 뒤쪽 귀 + 여유 1 (-48)
+WIN_ZG = 11.0                                                 # 가운데 창 앞끝 = 웜휠·허브(반지름 9) + 여유 1 + 모서리 둥글림 몫 1
+WIN_XE = -EAR_W - 1.0 - 0.9                                   # 귀 구간 창의 허브 쪽 끝 = 귀 + 여유 1 + 모서리 둥글림 몫 0.9 (-7.9)
+WIN_XG = MX + WORM_RA + 1.0                                   # 웜기어 구간 창의 모터 쪽 끝 = 웜 이끝 + 여유 1 (33)
+WIN_ZW = -(WR + 1.0) - 0.95                                   # 바퀴·허브 구간 창 뒤끝 = 바퀴 뒤끝 + 여유 (-21)
+WIN_ZM = -6.5 + 1.0                                           # 모터 구간 창 앞끝 = 모터 고정판 앞면 + 여유 1 (-5.5)
 JOINT_ANG = 79.0                                              # 관절 연결 나사·앞판 나사 각 (유닛 사이, deg)
 SCREW_ANG = (-25.0, 45.0)                                     # 덮개 고정 M2 각 (유닛마다 앞뒤 2개씩)
 
@@ -199,14 +212,48 @@ def cover_cutter(c=1.0):
         u = u.union(cyly(2 + 0.6, ROD_Y0, ROD_TOP + 1, 0, gz)).union(cyly(3.5 + 0.6, ROD_TOP - 2.6, ROD_TOP + 1, 0, gz))
     return u
 COVER_INFO = {}
+def tri_prism(d, rv, z0, z1, psi=None):
+    """둥근 삼각 기둥: 세 평면(중심에서 d, 법선 psi + 120k) ∩ 원(rv)."""
+    psi = TRI_PSI if psi is None else psi
+    pts = [(2 * d * math.cos(math.radians(psi + 60 + 120 * k)), 2 * d * math.sin(math.radians(psi + 60 + 120 * k))) for k in range(3)]
+    return cylz(rv, z0, z1).intersect(cq.Workplane("XY").polyline(pts).close().extrude(z1 - z0).translate((0, 0, z0)))
+def window():
+    """유닛 좌표의 창 (반지름 방향으로 뚫음). 구간마다 부품이 실제로 지나는 폭만큼만 뚫는다 (여유 1).
+    뒤부터: 모터 폭 → 귀 + 모터 폭 → 허브 + 모터 폭 → 허브 + 웜기어 폭 → 바퀴 폭."""
+    wx = WW / 2 + 1.0; wz = WR + 1.0
+    w = box(MX - 13.5, WIN_X1, 0, 70, WIN_ZR, WIN_ZE + 2).union(box(WIN_XE, WIN_X1, 0, 70, WIN_ZE - 0.9, WIN_ZW + 2)).union(
+        box(WIN_X0, WIN_X1, 0, 70, WIN_ZW, WIN_ZM)).union(box(WIN_X0, WIN_XG, 0, 70, WIN_ZM - 2, WIN_ZG)).union(box(-wx, wx, 0, 70, WIN_ZG - 2.5, wz))
+    return w.edges("|Y").fillet(WIN_R).union(box(-wx, wx, 0, 70, wz - WIN_R - 1, wz))      # 바퀴 창 앞 모서리는 각지게 (바퀴 여유 확보)
 def cover():
-    """한 덩어리 덮개. 바깥 Ø78. 앞뒤 판을 감싸는 양 끝은 두께 2, 그 사이는 안쪽 반지름 35까지 채운 뒤
+    """삼각 외피 (한 덩어리). 바깥 = 세 평면(TRI_D) ∩ 원(TRI_RV), 벽 두께 TRI_T. 양 끝 고리가 앞·뒷판(Ø74)을 감싼다.
+    꼭짓점(둥근 모서리)은 유닛 사이 빈 자리에, 평면은 바퀴 유닛 쪽에 둔다. 유닛은 평면의 창으로 드나든다.
+    창은 유닛마다 하나(window). 유닛 사이에는 꼭짓점을 따라 레일 세 줄이 남고, 레일은 안쪽을 채워 두껍게 한다.
+    창이 실제 부품 경로(cover_cutter: 행정 + 끼우는 경로, 여유 1)를 모두 포함하는지 COVER_INFO 에 남긴다."""
+    z0, z1 = Z_REAR + 3, Z_FRONT - FC_T
+    cov = tri_prism(TRI_D, TRI_RV, Z_REAR, Z_FRONT).cut(cylz(COV_RI, Z_REAR - 1, Z_FRONT + 1))  # 양 끝 고리
+    cov = cov.cut(tri_prism(TRI_D - TRI_T, TRI_RV - TRI_T, z0, z1))                              # 가운데는 벽 두께만 남김
+    phi_a = math.degrees(math.acos(WIN_X1 / (TRI_RV - TRI_EDGE)))                                # 레일의 모터 쪽 가장자리 각 (두께 TRI_EDGE 인 곳)
+    fill = tri_prism(TRI_D, TRI_RV, z0, z1).cut(cylz(COV_RI + 0.5, z0 - 1, z1 + 1))
+    rail = fill.intersect(box(WIN_X1, 60, -40, 40, z0, z1)).intersect(rotz(box(-60, WIN_X0, 0, 70, z0, z1), 240)).intersect(rotz(box(30, 60, -40, 0, z0, z1), phi_a))
+    for k in range(3): cov = cov.union(rotz(rail, 120 * k))                                      # 레일 안쪽 채움 (유닛 0 창과 옆 유닛 창 사이)
+    w = window(); trim = rotz(box(30, 60, 0, 22, WIN_ZR, WIN_ZM), phi_a)                         # trim: 창 가장자리의 얇은 날을 잘라 냄
+    for k in range(3): cov = cov.cut(rotz(w, 120 * k)).cut(rotz(trim, 120 * k))
+    sol = cov.solids().vals()
+    COVER_INFO["dropped_mm3"] = round(sum(x.Volume() for x in sol) - max(x.Volume() for x in sol), 1)
+    cov = cq.Workplane("XY").add(max(sol, key=lambda x: x.Volume()))
+    cut = cover_cutter()
+    COVER_INFO["path_overlap_mm3"] = round(sum(x.Volume() for k in range(3) for x in cov.intersect(rotz(cut, 120 * k)).solids().vals()), 2)
+    for k in range(3):                                            # 앞·뒷판 M2
+        for ang in SCREW_ANG:
+            for z in (Z_REAR + 1.5, Z_FRONT - 1.5): cov = cov.cut(rotz(radial(1.1, COV_RI - 1, TRI_RV + 1, ang, z), 120 * k))
+    return cov
+def cover_round():
+    """[이전 덮개, 대안으로 남김] 한 덩어리 원통 덮개. 바깥 Ø78. 앞뒤 판을 감싸는 양 끝은 두께 2, 그 사이는 안쪽 반지름 35까지 채운 뒤
     움직이는 부품이 행정 전체에서 지나는 공간(+여유 1)과 가이드봉 자리를 잘라 창을 낸다."""
     cov = tube(COV_RO, COV_RI, Z_REAR, Z_FRONT).union(tube(COV_RO, COV_RI_IN, Z_REAR + 3, Z_FRONT - FC_T))
     cut = cover_cutter()
     for k in range(3): cov = cov.cut(rotz(cut, 120 * k))
     sol = cov.solids().vals()                                     # 창 사이에 떨어진 작은 조각은 버림 (본체만)
-    COVER_INFO["dropped_mm3"] = round(sum(s.Volume() for s in sol) - max(s.Volume() for s in sol), 1)
     cov = cq.Workplane("XY").add(max(sol, key=lambda s: s.Volume()))
     for k in range(3):
         for ang in SCREW_ANG:
@@ -268,9 +315,9 @@ if __name__ == "__main__":
     log(f"CadQuery {cq.__version__}, Python {sys.version.split()[0]}")
     log(f"모듈 길이 {Z_FRONT - Z_REAR:.1f}, 행정 d {D_MIN}~{D_MAX}, 스프링 한계 d {D_SOLID:.2f}, 이음부 d {D_JOINT:.2f}")
     P = {n: f() for n, f in PRINT.items()}
-    log(f"덮개에서 버린 떨어진 조각 부피 {COVER_INFO['dropped_mm3']} mm3")
+    log(f"덮개(삼각 외피): 버린 떨어진 조각 {COVER_INFO['dropped_mm3']} mm3, 창과 부품 경로(행정 + 끼우는 경로, 여유 1)의 겹침 {COVER_INFO['path_overlap_mm3']} mm3 (0 이어야 함)")
     (OUT / "stl").mkdir(exist_ok=True); (OUT / "step").mkdir(exist_ok=True)
-    for old in ("cover_petal.stl", "cover_petal.step"):                # 이전 3조각 덮개 파일 정리
+    for old in ("cover_petal.stl", "cover_petal.step", "cover_tri.stl", "cover_tri.step"):   # 이전 이름의 덮개 파일 정리
         f = OUT / ("stl" if old.endswith("stl") else "step") / old
         if f.exists(): f.unlink()
     for n, p in P.items():
@@ -278,6 +325,10 @@ if __name__ == "__main__":
         log(f"{n} ×{QTY[n]}: 솔리드 {sol}, 유효 {ok}, {bb.xlen:.1f} × {bb.ylen:.1f} × {bb.zlen:.1f} mm, {sum(s.Volume() for s in p.solids().vals())/1000:.1f} cm3")
         cq.exporters.export(p, str(OUT / "stl" / f"{n}.stl"), tolerance=0.02, angularTolerance=0.15)
         cq.exporters.export(p, str(OUT / "step" / f"{n}.step"))
+    cr = cover_round()                                                 # 이전 원통 덮개: 파일만 함께 냄 (조립·검사에는 넣지 않음)
+    log(f"cover_round (대안, 검사 제외): 솔리드 {cr.solids().size()}, 유효 {cr.val().isValid()}, {sum(s.Volume() for s in cr.solids().vals())/1000:.1f} cm3")
+    cq.exporters.export(cr, str(OUT / "stl" / "cover_round.stl"), tolerance=0.02, angularTolerance=0.15)
+    cq.exporters.export(cr, str(OUT / "step" / "cover_round.step"))
     asm = cq.Assembly(name="front_module_v2")
     col = dict(slider="lightskyblue", hub="khaki", wheel="royalblue", wormwheel="goldenrod", worm="goldenrod", axle="gray40", bearing="gray50",
                bushing="gray60", motor="gray70", plug="green", base="slategray", front_cap="gray80", petal="gray85", rods="gray30", spacer="plum")

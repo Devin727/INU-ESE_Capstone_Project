@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>앞 모듈 v2 3D 설명</title>
+<style>
+:root{--bg:#f3f5f3;--panel:#ffffff;--ink:#18372f;--muted:#53675f;--line:#c9d5cd;--accent:#2f6fb0;--warn:#a33a2c;--scene:#eef2ef;--chip:#e7ede9}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12181a;--panel:#1b2326;--ink:#e6efea;--muted:#9fb1a9;--line:#33423f;--accent:#7fb3e6;--warn:#f08a7b;--scene:#161d20;--chip:#263134}}
+:root[data-theme="dark"]{--bg:#12181a;--panel:#1b2326;--ink:#e6efea;--muted:#9fb1a9;--line:#33423f;--accent:#7fb3e6;--warn:#f08a7b;--scene:#161d20;--chip:#263134}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;font-size:15px;line-height:1.55}
+#app{display:grid;grid-template-columns:minmax(0,1fr) 380px;height:100%}
+#view{position:relative;min-height:0;background:var(--scene)}
+#view canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#view canvas.drag{cursor:grabbing}
+#title{position:absolute;left:16px;top:12px;right:16px;pointer-events:none}
+#title h1{margin:0;font-size:22px}
+#title p{margin:2px 0 0;color:var(--muted);font-size:13px}
+#hint{position:absolute;left:16px;bottom:12px;color:var(--muted);font-size:12.5px;pointer-events:none}
+#tip{position:absolute;display:none;padding:4px 9px;border-radius:6px;background:var(--panel);border:1px solid var(--line);font-size:13px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+#side{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:16px}
+h2{font-size:15px;margin:18px 0 8px}
+h2:first-child{margin-top:0}
+.steps{display:grid;gap:6px}
+.steps button{display:flex;gap:10px;align-items:baseline;text-align:left;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink);font:inherit;cursor:pointer}
+.steps button b{color:var(--muted);font-variant-numeric:tabular-nums}
+.steps button[aria-current="true"]{border-color:var(--accent);background:var(--chip)}
+.steps button[aria-current="true"] b{color:var(--accent)}
+#stepText{margin:10px 0 0;padding:10px 12px;border-radius:8px;background:var(--chip);font-size:14px}
+.nav{display:flex;gap:8px;margin-top:8px}
+.nav button,.row button{flex:1;padding:8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink);font:inherit;cursor:pointer}
+.nav button:hover,.steps button:hover,.row button:hover{border-color:var(--accent)}
+label.sl{display:block;margin:10px 0 2px;font-size:13.5px}
+label.sl span{float:right;color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:13.5px}
+.checks label{display:flex;gap:6px;align-items:center}
+.seg{display:flex;gap:6px;margin:6px 0}
+.seg label{flex:1;text-align:center;padding:6px;border:1px solid var(--line);border-radius:8px;font-size:13px;cursor:pointer}
+.seg input{position:absolute;opacity:0}
+.seg input:checked+span{color:var(--accent);font-weight:700}
+#susp{margin:6px 0 0;font-size:13.5px;display:grid;grid-template-columns:auto 1fr;gap:2px 12px}
+#susp dt{color:var(--muted)}#susp dd{margin:0;font-variant-numeric:tabular-nums}
+#susp .bad{color:var(--warn);font-weight:700}
+#parts{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+#parts button{display:flex;gap:7px;align-items:center;padding:5px 7px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--ink);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+#parts button:hover{border-color:var(--line)}
+#parts button[aria-pressed="true"]{border-color:var(--accent);background:var(--chip)}
+#parts i{width:12px;height:12px;border-radius:3px;flex:none}
+#info{margin-top:8px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;min-height:92px}
+#info b{font-size:15px}
+#info .src{display:inline-block;margin-left:6px;padding:0 7px;border-radius:10px;background:var(--chip);color:var(--muted);font-size:12px}
+.note{margin-top:16px;color:var(--muted);font-size:12.5px}
+.note .w{color:var(--warn)}
+@media (max-width:820px){#app{grid-template-columns:1fr;grid-template-rows:52vh minmax(0,1fr)}#side{border-left:0;border-top:1px solid var(--line)}#title h1{font-size:18px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="view">
+    <canvas id="c"></canvas>
+    <div id="title"><h1>앞 모듈 v2 — 3D로 보는 구조</h1><p>배관 안을 바퀴 3개로 밀착해 주행하는 앞 마디 · 내경 120 시연 기준 · CAD 형상 그대로</p></div>
+    <div id="hint">끌기: 돌리기 · 휠/두 손가락: 확대 · Shift+끌기 또는 오른쪽 끌기: 옮기기 · 부품을 누르면 설명</div>
+    <div id="tip"></div>
+  </div>
+  <aside id="side">
+    <h2>단계별 설명</h2>
+    <div class="steps" id="steps"></div>
+    <p id="stepText"></p>
+    <div class="nav"><button id="prev" type="button">← 이전</button><button id="next" type="button">다음 →</button></div>
+
+    <h2>직접 조절</h2>
+    <label class="sl" for="sE">분해 정도 <span id="vE"></span></label>
+    <input id="sE" type="range" min="0" max="300" value="0">
+    <div class="checks" style="margin-top:8px">
+      <label><input id="cSolo" type="checkbox"> 유닛 하나만</label>
+      <label><input id="cGlass" type="checkbox" checked> 덮개 반투명</label>
+      <label><input id="cPipe" type="checkbox"> 배관 보이기</label>
+      <label><input id="cSpin" type="checkbox"> 천천히 회전</label>
+    </div>
+    <div class="row" style="display:flex;margin-top:8px"><button id="reset" type="button">시점 처음으로</button></div>
+
+    <h2>서스펜션 (배관 크기에 따라)</h2>
+    <label class="sl" for="sD">배관 내경 <span id="vD"></span></label>
+    <input id="sD" type="range" min="100" max="124" step="0.5" value="120">
+    <div class="seg">
+      <label><input type="radio" name="set" value="120" checked><span>내경 120 설정 (스페이서 9 mm)</span></label>
+      <label><input type="radio" name="set" value="100"><span>내경 100 설정 (스페이서 없음)</span></label>
+    </div>
+    <dl id="susp"></dl>
+
+    <h2>부품</h2>
+    <div id="parts"></div>
+    <div id="info">부품을 누르면 이름과 역할이 여기에 나옵니다.</div>
+
+    <p class="note">형상은 <code>cad/v2/front_module_v2.py</code>에서 만든 것이다. 스프링은 단순한 코일로 그렸고, 옴니휠은 원통 외형이다. 힘과 길이는 계산값이다.<br><span class="w">실물 출력·조립·주행 시험은 아직 하지 않았다. 계산상 내경 120 엘보는 통과, 내경 100 엘보는 불통과다.</span></p>
+  </aside>
+</div>
+
+<script>/*__THREE__*/</script>
+<script>
+const DATA = /*__DATA__*/null;
+(function(){
+"use strict";
+const K = DATA.c;
+const PARTS = {
+  cover:    {name:"삼각 외피 (덮개)", src:"출력", color:"#c9d3ce", role:"세 평면(중심에서 "+K.coverFlat+" mm)과 둥근 모서리(반지름 "+K.coverR+" mm)로 된 한 덩어리 덮개. 평면마다 모서리를 둥글린 창이 하나씩 있어 바퀴·모터가 드나든다. 세 꼭짓점을 따라 레일 세 줄이 앞뒤를 잇는다."},
+  front_cap:{name:"앞판", src:"출력", color:"#6e8f82", role:"기둥 앞끝을 막는 판. 가운데 구멍으로 배선이 지난다. 앞면에 거리 센서(ToF)를 붙일 자리다."},
+  base:     {name:"기둥 + 뒷판", src:"출력", color:"#466e5e", role:"뒷판, 가운데 기둥, 스프링 받침 블록이 한 덩어리다. 가이드봉 6개가 여기에 박힌다. 기둥 속으로 배선이 지난다."},
+  rods:     {name:"가이드봉 + 스토퍼", src:"구매", color:"#3a4447", role:"Ø4 샤프트를 잘라 쓴다. 유닛이 이 봉을 타고 반지름 방향으로 움직인다. 끝의 스토퍼가 유닛이 빠지지 않게 막는다."},
+  spacer:   {name:"스페이서", src:"출력", color:"#b68cb8", role:"두께 "+K.spacer+" mm 링. 스프링 받침을 높여 내경 120에 맞춘다. 빼면 내경 100~106용 설정이 된다."},
+  spring:   {name:"스프링 C202", src:"구매", color:"#e07b1a", role:"바퀴 하나에 2개. 유닛을 벽 쪽으로 밀어 바퀴를 붙인다. 그림은 단순한 코일 모양이다."},
+  slider:   {name:"슬라이더", src:"출력", color:"#4386ba", role:"바퀴 유닛의 몸체. 베어링 자리 2곳, 모터 고정판, 모터 받침, 볼부시가 들어가는 귀가 한 덩어리다."},
+  motor:    {name:"모터 FIT0522", src:"구매", color:"#b9c1c8", role:"6 V, 100 rpm, 엔코더 내장. 배관 길이 방향으로 눕혀 바퀴 뒤에 둔다. 출력축에 웜을 직접 끼운다."},
+  plug:     {name:"플러그 공간", src:"가정", color:"#8fb79a", role:"모터 뒤 커넥터와 전선이 차지할 공간을 10 mm로 가정한 것. 실물로 재야 한다."},
+  worm:     {name:"웜", src:"출력", color:"#c9922a", role:"나사 모양 기어. 모터 축의 회전을 직각으로 꺾어 웜휠에 전한다. 모듈 1.0, 한 줄."},
+  wormwheel:{name:"웜휠", src:"출력", color:"#d7a63a", role:K.ratio+"개 이를 가진 기어. 웜 한 바퀴에 이 하나씩 돌아 1:"+K.ratio+"로 감속한다. 바퀴 축에 고정된다."},
+  axle:     {name:"바퀴 축", src:"구매", color:"#596c7b", role:"Ø4 샤프트. 웜휠, 허브, 바퀴가 이 축과 함께 돈다."},
+  bearingB: {name:"베어링 MF74ZZ (바퀴 쪽)", src:"미구매", color:"#c66643", role:"안지름 4, 바깥지름 7 mm 플랜지 베어링. 지지판 B에서 바퀴 축을 받친다."},
+  bearingC: {name:"베어링 MF74ZZ (바깥쪽)", src:"미구매", color:"#c66643", role:"지지판 C에서 바퀴 축을 받친다. 두 베어링 사이에 웜휠이 있다."},
+  hub:      {name:"허브", src:"출력", color:"#e1b14c", role:"옴니휠과 바퀴 축을 잇는 부품. 바퀴에는 M2 볼트 4개, 축에는 멈춤나사로 고정한다."},
+  wheel:    {name:"옴니휠", src:"구매", color:"#2f5f93", role:"Nexus 14166, 지름 38.1 mm. 배관 벽에 닿아 구르는 바퀴. 그림은 원통 외형이다."},
+  bushing:  {name:"볼부시 LM4UU", src:"구매", color:"#7a8b99", role:"리니어 볼부시(4×8×12). 슬라이더 귀에 끼워 가이드봉을 매끄럽게 탄다."}
+};
+const OFF = {motor:[0,0,-48], plug:[0,0,-48], worm:[0,0,30], wormwheel:[0,34,0], bearingB:[-14,0,0], bearingC:[18,0,0],
+             axle:[66,0,0], wheel:[-42,0,0], hub:[-66,0,0], bushing:[0,24,0], slider:[0,0,0]};
+const UNIT_OUT = 46, COVER_OUT = 150, CAP_OUT = 185;
+const STEPS = [
+  {t:"전체 모습", e:0, solo:false, pipe:false, cam:[330,0,0,-30], text:"바퀴 3개가 120° 간격으로 달린 마디다. 덮개는 삼각 외피이고 최대 반지름 "+K.coverR+" mm, 길이 "+K.length.toFixed(1)+" mm. 바퀴와 모터는 외피의 창으로 나온다."},
+  {t:"덮개와 앞판을 벗기면", e:1, solo:false, pipe:false, cam:[520,0,0,45], text:"안에는 가운데 기둥이 있고, 그 둘레에 바퀴 유닛 3개가 붙어 있다. 기둥 속 구멍으로 배선이 지난다. 모터 드라이버와 ESP32는 뒤 마디에 둔다."},
+  {t:"바퀴 유닛을 빼면", e:2, solo:false, pipe:false, cam:[600,0,0,45], text:"유닛은 기둥에 박힌 가이드봉 2개를 타고 반지름 방향으로 움직인다. 봉마다 스프링이 있어 유닛을 바깥으로 민다. 조립할 때도 유닛을 바깥에서 봉에 끼운다."},
+  {t:"유닛 하나를 분해하면", e:3, solo:true, pipe:false, cam:[440,0,78,-22], text:"모터 → 웜(모터 축에 직결) → 웜휠 → 바퀴 축 → 옴니휠 순서로 힘이 전달된다. 웜기어가 회전 방향을 직각으로 꺾고 1:"+K.ratio+"로 감속한다. 축은 베어링 2개가 받친다."},
+  {t:"배관 안에서", e:0, solo:false, pipe:true, cam:[400,0,0,-30], text:"아래 '배관 내경'을 움직여 보면 유닛이 봉을 타고 드나들며 벽을 따라간다. 내경 120에서 바퀴 하나를 약 11 N으로 누른다. 배관 크기 범위를 바꿀 때는 스페이서를 넣거나 뺀다."}
+];
+
+const canvas = document.getElementById("c"), view = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 5, 4000);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x556066, 0.85));
+const sun = new THREE.DirectionalLight(0xffffff, 0.75); camera.add(sun); sun.position.set(-0.6, 0.9, 1); scene.add(camera);
+
+function bytes(s){const b=atob(s), u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u.buffer;}
+function geom(d){
+  const q=new Int16Array(bytes(d.p)), pos=new Float32Array(q.length);
+  for(let i=0;i<q.length;i++) pos[i]=q[i]/K.scale;
+  const g=new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos,3));
+  g.setIndex(new THREE.BufferAttribute(d.w? new Uint32Array(bytes(d.i)) : new Uint16Array(bytes(d.i)), 1));
+  g.computeVertexNormals(); return g;
+}
+const GEO = {}; for(const k in DATA.parts) GEO[k]=geom(DATA.parts[k]);
+const MAT = {}, meshes = [];
+function mat(key){ if(!MAT[key]) MAT[key]=new THREE.MeshStandardMaterial({color:PARTS[key].color, roughness:0.62, metalness:0.08, side:THREE.DoubleSide}); return MAT[key]; }
+function part(key, geo){ const m=new THREE.Mesh(geo||GEO[key], mat(key)); m.userData.key=key; meshes.push(m); return m; }
+
+const root = new THREE.Group(); scene.add(root);
+const base = part("base"), cap = part("front_cap"), cover = part("cover");
+root.add(base, cap, cover);
+MAT.cover.transparent = true; MAT.cover.depthWrite = false;
+
+function springGeo(L){
+  const pts=[], turns=7, n=turns*16, r=2.75;
+  for(let i=0;i<=n;i++){const a=i/n*turns*2*Math.PI; pts.push(new THREE.Vector3(r*Math.cos(a), i/n*L, r*Math.sin(a)));}
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n, 0.38, 5, false);
+}
+let springGeom = springGeo(12);
+const units = [], springs = [];
+for(let k=0;k<3;k++){
+  const U=new THREE.Group(); U.rotation.z=k*2*Math.PI/3; root.add(U);
+  const rods=part("rods"), spacer=part("spacer"); U.add(rods, spacer);
+  const sp=[]; for(const gz of K.guideZ){ const s=part("spring", springGeom); s.position.set(0,0,gz); U.add(s); sp.push(s); springs.push(s); }
+  const M=new THREE.Group(); U.add(M);
+  const P={}; for(const key in OFF){ P[key]=part(key); M.add(P[key]); }
+  units.push({U, M, P, spacer, sp});
+}
+const pipe = new THREE.Mesh(new THREE.CylinderGeometry(1,1,230,64,1,true),
+  new THREE.MeshStandardMaterial({color:0x8fa3b5, transparent:true, opacity:0.2, side:THREE.DoubleSide, depthWrite:false, roughness:0.9}));
+pipe.rotation.x=Math.PI/2; pipe.position.z=(K.zFront+K.zRear)/2; pipe.visible=false; root.add(pipe);
+
+// ----- 상태 -----
+const S = {e:0, eT:0, solo:false, pipe:false, id:120, set:120, step:0, sel:null, hover:null};
+const cl = (v,a,b)=>Math.min(b,Math.max(a,v)), ease = t=>t*t*(3-2*t);
+function suspension(){
+  const d = S.id/2 - K.WR - K.A0, seatTop = K.seat + (S.set===120? K.spacer : 0);
+  const L = K.A0 + d - K.earOff - seatTop;
+  return {d, seatTop, L, axle:K.A0+d};
+}
+function apply(){
+  const cv=ease(cl(S.e,0,1)), un=ease(cl(S.e-1,0,1)), pt=ease(cl(S.e-2,0,1)), su=suspension();
+  cover.position.z = cv*COVER_OUT; cap.position.z = cv*CAP_OUT; cover.visible = cap.visible = !(S.solo && S.e>1.5);
+  const Ls = cl(su.L + un*UNIT_OUT, 2, K.springFree);
+  if(Math.abs(Ls-apply.L)>0.02){ const g=springGeo(Ls); springs.forEach(s=>s.geometry=g); springGeom.dispose(); springGeom=g; apply.L=Ls; }
+  units.forEach((u,k)=>{
+    u.M.position.y = su.d + un*UNIT_OUT;
+    for(const key in OFF){ const o=OFF[key]; u.P[key].position.set(o[0]*pt, o[1]*pt, o[2]*pt); }
+    u.spacer.visible = S.set===120;
+    u.sp.forEach(s=>s.position.y = su.seatTop);
+    u.U.visible = !(S.solo && k>0);
+  });
+  pipe.visible = S.pipe; pipe.scale.set(S.id/2, 1, S.id/2);
+}
+apply.L = -1;
+
+// ----- 시점 -----
+const V = {theta:-0.75, phi:1.12, r:330, target:new THREE.Vector3(0,0,-30)};
+let VT = null;
+const V0 = JSON.parse(JSON.stringify({theta:V.theta, phi:V.phi, r:V.r}));
+function placeCamera(){
+  const sp=Math.sin(V.phi), cp=Math.cos(V.phi);
+  camera.position.set(V.target.x+V.r*sp*Math.sin(V.theta), V.target.y+V.r*cp, V.target.z+V.r*sp*Math.cos(V.theta));
+  camera.lookAt(V.target);
+}
+function resize(){ const w=view.clientWidth, h=view.clientHeight; renderer.setSize(w,h,false); camera.aspect=w/Math.max(h,1); camera.updateProjectionMatrix(); }
+function themeColor(){ renderer.setClearColor(new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue("--scene").trim()||"#eef2ef")); }
+window.addEventListener("resize", resize);
+if(window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", themeColor);
+
+const ptr = new Map(); let moved=0, pinch=0;
+canvas.addEventListener("contextmenu", e=>e.preventDefault());
+canvas.addEventListener("pointerdown", e=>{ canvas.setPointerCapture(e.pointerId); ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,b:e.button,sh:e.shiftKey}); moved=0; VT=null; canvas.classList.add("drag");
+  if(ptr.size===2){ const a=[...ptr.values()]; pinch=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y); } });
+canvas.addEventListener("pointermove", e=>{
+  const p=ptr.get(e.pointerId);
+  if(!p){ hoverAt(e); return; }
+  const dx=e.clientX-p.x, dy=e.clientY-p.y; p.x=e.clientX; p.y=e.clientY; moved+=Math.abs(dx)+Math.abs(dy);
+  if(ptr.size===2){ const a=[...ptr.values()], d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y); if(pinch>0) V.r=cl(V.r*pinch/d,90,1200); pinch=d; return; }
+  if(p.b===2 || p.sh){ const k=V.r*0.0016; const right=new THREE.Vector3().setFromMatrixColumn(camera.matrix,0), up=new THREE.Vector3().setFromMatrixColumn(camera.matrix,1);
+    V.target.addScaledVector(right,-dx*k).addScaledVector(up,dy*k); }
+  else { V.theta-=dx*0.006; V.phi=cl(V.phi-dy*0.006,0.12,Math.PI-0.12); }
+});
+function up(e){ const p=ptr.get(e.pointerId); ptr.delete(e.pointerId); if(ptr.size<2) pinch=0; if(!ptr.size) canvas.classList.remove("drag"); if(p && moved<5) pickAt(e); }
+canvas.addEventListener("pointerup", up); canvas.addEventListener("pointercancel", up);
+canvas.addEventListener("pointerleave", ()=>{ setHover(null); tip.style.display="none"; });
+canvas.addEventListener("wheel", e=>{ e.preventDefault(); VT=null; V.r=cl(V.r*Math.exp(e.deltaY*0.0012),90,1200); }, {passive:false});
+
+// ----- 부품 고르기 -----
+const ray = new THREE.Raycaster(), tip = document.getElementById("tip"), info = document.getElementById("info");
+function hit(e){
+  const r=canvas.getBoundingClientRect(); const v=new THREE.Vector2((e.clientX-r.left)/r.width*2-1, -(e.clientY-r.top)/r.height*2+1);
+  ray.setFromCamera(v,camera);
+  const list=ray.intersectObjects(meshes.filter(m=>{ let o=m; while(o){ if(!o.visible) return false; o=o.parent; } return true; }), false);
+  return list.length? list[0].object.userData.key : null;
+}
+function paint(){ for(const k in MAT){ const on = k===S.sel, hv = k===S.hover; MAT[k].emissive.set(on? 0x2a5a8a : hv? 0x1c3c5c : 0x000000); MAT[k].emissiveIntensity = on? 0.75 : hv? 0.55 : 0; } }
+function setHover(k){ if(S.hover!==k){ S.hover=k; paint(); } }
+function hoverAt(e){ const k=hit(e); setHover(k); if(k){ const r=view.getBoundingClientRect(); tip.textContent=PARTS[k].name; tip.style.display="block"; tip.style.left=(e.clientX-r.left+14)+"px"; tip.style.top=(e.clientY-r.top+14)+"px"; } else tip.style.display="none"; }
+function select(k){
+  S.sel = (S.sel===k)? null : k; paint();
+  document.querySelectorAll("#parts button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.k===S.sel));
+  info.innerHTML = S.sel? "<b>"+PARTS[S.sel].name+"</b><span class='src'>"+PARTS[S.sel].src+"</span><br>"+PARTS[S.sel].role : "부품을 누르면 이름과 역할이 여기에 나옵니다.";
+}
+function pickAt(e){ const k=hit(e); if(k) select(k); }
+
+// ----- 화면 요소 -----
+const $ = id=>document.getElementById(id);
+const stepsEl=$("steps");
+STEPS.forEach((s,i)=>{ const b=document.createElement("button"); b.type="button"; b.innerHTML="<b>"+(i+1)+"</b><span>"+s.t+"</span>"; b.onclick=()=>go(i); stepsEl.appendChild(b); });
+function go(i){
+  S.step=(i+STEPS.length)%STEPS.length; const s=STEPS[S.step];
+  S.eT=s.e; S.solo=s.solo; S.pipe=s.pipe; $("cSolo").checked=s.solo; $("cPipe").checked=s.pipe;
+  VT = {r:s.cam[0], t:new THREE.Vector3(s.cam[1], s.cam[2], s.cam[3])};
+  [...stepsEl.children].forEach((b,j)=>b.setAttribute("aria-current", j===S.step));
+  $("stepText").textContent=s.text;
+}
+$("prev").onclick=()=>go(S.step-1); $("next").onclick=()=>go(S.step+1);
+$("sE").oninput=e=>{ S.eT=S.e=e.target.value/100; };
+$("cSolo").onchange=e=>{ S.solo=e.target.checked; };
+$("cPipe").onchange=e=>{ S.pipe=e.target.checked; };
+function glass(){ const on=$("cGlass").checked; MAT.cover.opacity=on?0.38:1; MAT.cover.transparent=on; MAT.cover.depthWrite=!on; MAT.cover.needsUpdate=true; }
+$("cGlass").onchange=glass;
+$("reset").onclick=()=>{ V.theta=V0.theta; V.phi=V0.phi; const s=STEPS[S.step]; VT={r:s.cam[0], t:new THREE.Vector3(s.cam[1],s.cam[2],s.cam[3])}; };
+$("sD").oninput=e=>{ S.id=parseFloat(e.target.value); if(!S.pipe){ S.pipe=true; $("cPipe").checked=true; } susp(); };
+document.querySelectorAll("input[name=set]").forEach(r=>r.onchange=()=>{ S.set=parseInt(document.querySelector("input[name=set]:checked").value,10); susp(); });
+function susp(){
+  const su=suspension(); $("vD").textContent=S.id.toFixed(1)+" mm";
+  let st, cls="";
+  if(su.L > K.springFree){ st="스프링이 떠서 누르는 힘이 없음"; cls="bad"; }
+  else if(su.L < K.springMin-0.005){ st="스프링 한계보다 더 눌림 (이 설정으로는 불가)"; cls="bad"; }
+  else st="바퀴당 약 "+(2*K.springK*(K.springFree-su.L)).toFixed(1)+" N";
+  $("susp").innerHTML="<dt>바퀴 축 높이</dt><dd>"+su.axle.toFixed(2)+" mm</dd><dt>스프링 길이</dt><dd>"+su.L.toFixed(2)+" mm (자유 "+K.springFree+", 한계 "+K.springMin+")</dd><dt>누르는 힘</dt><dd class='"+cls+"'>"+st+"</dd>";
+}
+const partsEl=$("parts");
+for(const k in PARTS){ const b=document.createElement("button"); b.type="button"; b.dataset.k=k; b.setAttribute("aria-pressed","false");
+  b.innerHTML="<i style='background:"+PARTS[k].color+"'></i><span>"+PARTS[k].name+"</span>"; b.onclick=()=>select(k); partsEl.appendChild(b); }
+
+// ----- 그리기 -----
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(Math.abs(S.eT-S.e)>0.001){ const stp=dt*1.6; S.e += cl(S.eT-S.e,-stp,stp); }
+  if(document.activeElement!==$("sE")) $("sE").value=Math.round(S.e*100);
+  if(VT){ const a=Math.min(1,dt*4); V.r+=(VT.r-V.r)*a; V.target.lerp(VT.t,a); if(Math.abs(VT.r-V.r)<0.5 && V.target.distanceTo(VT.t)<0.5) VT=null; }
+  $("vE").textContent = S.e<0.02? "조립 상태" : S.e<=1.02? "덮개 벗김" : S.e<=2.02? "유닛 뺌" : "유닛 분해";
+  if($("cSpin").checked && !ptr.size) V.theta+=dt*0.25;
+  apply(); placeCamera(); renderer.render(scene,camera);
+  requestAnimationFrame(frame);
+}
+resize(); themeColor(); glass(); susp(); go(0); paint();
+const q=new URLSearchParams(location.search);
+if(q.has("step")){ go(parseInt(q.get("step"),10)-1); S.e=S.eT; if(VT){ V.r=VT.r; V.target.copy(VT.t); VT=null; } }
+requestAnimationFrame(frame);
+window.__ready = true;
+})();
+</script>
+</body>
+</html>

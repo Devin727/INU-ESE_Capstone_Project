@@ -1,0 +1,202 @@
+<?xml version="1.0"?>
+<!-- 앞 모듈 v2 단독 모델 (2026-11-26). CAD: docs/강민수/cad/v2 (front_module_v2.py)
+     구조: 몸체(base_link) 에 바퀴 유닛 3개가 120° 간격. 유닛은 가이드봉을 타고 반지름 방향으로 움직이고 (직선 관절 + 스프링),
+           유닛마다 모터 1개가 웜기어(1:16)로 옴니휠 1개를 돌림. 삼각 외피는 몸체에 고정.
+       base_link ─ u{k}_slide_joint (직선, 스프링) ─ u{k}_slider ─ u{k}_wheel_joint (구동) ─ u{k}_wheel     (k = 0, 1, 2)
+     좌표: 앞 = +x (배관 축), 위 = +z. base_link 원점 = 몸체 축 위, 바퀴 축 평면. 유닛 0 의 바퀴가 위, 유닛 k 는 x 축으로 120k° 돈 자리.
+           몸체는 x -85.5 ~ +23 mm (뒤가 김).
+     자동 생성 파일: cad_params.xacro (치수·스프링·질량·관성), meshes/*.stl (보이는 모양) = docs/강민수/cad/v2/urdf_export.py 가 만듦.
+     [CAD 값] 치수, 행정, 스프링 길이 관계, 출력 부품 부피
+     [판매 표기] 모터 96 g, 바퀴 28 g, 모터 스톨 6.5 kg·cm · 무부하 100 rpm, C202 자유 길이·하중
+     [추정] 출력 부품 밀도(속 100 %), 웜 효율 0.35, 마찰계수, 직선 관절 감쇠, 충돌체 단순화 (아래 주석)
+     [모델에 없는 것] 웜의 역구동 잠김 (감쇠로만 흉내), 옴니휠 롤러 (방향별 마찰로 대신), 보드·전선·나사, 뒤 마디와 관절.
+       바퀴 3개가 한 단면에 있어 이 모듈만으로는 앞뒤 기울기(피치·요)를 못 잡는다. 실물은 뒤 마디가 잡을 자리 (미설계).
+       직관 주행 시험용으로 rear_support:=true (시뮬 전용 임시 뒤 받침) 를 둘 수 있다. 기본은 꺼짐.
+     배관 내경과 설정: spacer:=auto 는 내경 115 mm 이상이면 스페이서 9 mm (내경 120 설정), 아니면 스페이서 없음 (내경 100~106 설정).
+       시뮬 기본 배관은 내경 100.8 mm 라 스페이서 없는 설정으로 뜬다. 내경 120 배관은 config/courses.yaml 의 pipe.inner_d 를 바꿔야 한다. -->
+<robot name="front_v2" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="pipe_inner_d" default="0.1008"/>
+  <xacro:arg name="params_file" default=""/>
+  <xacro:arg name="suspension" default="all"/>
+  <xacro:arg name="spacer" default="auto"/>            <!-- auto | on | off -->
+  <xacro:arg name="wheel_shape" default="cylinder"/>   <!-- cylinder (바퀴 폭 23 mm 의 가장자리가 벽에 닿음) | sphere -->
+  <xacro:arg name="rear_support" default="false"/>     <!-- true = 시뮬 전용 임시 뒤 받침 (아래 "임시 뒤 받침"). 실물 설계에 없는 것 -->
+  <xacro:arg name="rear_gap" default="0.001"/>         <!-- 임시 뒤 받침 끝과 배관 벽의 틈 [m] -->
+  <xacro:arg name="motor_stall" default="3.57"/>       <!-- 바퀴 축 기준 스톨 토크 [N·m] = 0.637 x 16 x 효율 0.35 [추정]. robot.yaml 과 같게 -->
+  <xacro:arg name="motor_no_load" default="0.654"/>    <!-- 바퀴 축 기준 무부하 속도 [rad/s] = 100 rpm / 16 (약 12.5 mm/s). robot.yaml 과 같게 -->
+  <xacro:include filename="$(find pipe_robot_sim)/models/common/common.xacro"/>
+  <xacro:include filename="$(find pipe_robot_sim)/models/front_v2/cad_params.xacro"/>
+  <xacro:property name="mesh" value="file://$(find pipe_robot_sim)/models/front_v2/meshes"/>
+
+  <!-- ===== 설정 ===== -->
+  <xacro:property name="Rp" value="${$(arg pipe_inner_d)/2}"/>
+  <xacro:property name="sp_on" value="${'$(arg spacer)' == 'on' or ('$(arg spacer)' == 'auto' and 2*Rp >= 0.115)}"/>
+  <xacro:property name="sp" value="${cad_spacer if sp_on else 0.0}"/>
+  <!-- 변위 d = 바퀴 축 높이 - cad_axle_h (바깥이 +). 스프링 길이 = cad_spring_gap0 + d - sp -->
+  <xacro:property name="d_free" value="${sp - (cad_spring_gap0 - cad_spring_free)}"/>               <!-- 스프링이 풀리는 변위 -->
+  <xacro:property name="d_lo" value="${max(cad_d_min, sp - (cad_spring_gap0 - cad_spring_min))}"/>   <!-- 행정 끝 또는 스프링 최소 길이 -->
+  <xacro:property name="d_hi" value="${min(cad_d_max, d_free)}"/>   <!-- 스프링이 풀린 뒤로는 밀지 못하므로 거기까지만 (당기는 스프링이 되지 않게) -->
+  <!-- 바퀴가 벽에 닿는 변위. 원통 충돌체는 폭 가장자리가 먼저 닿아 축이 조금 낮다 -->
+  <xacro:property name="h_wall" value="${sqrt(Rp*Rp - cad_wheel_w*cad_wheel_w/4) - cad_wheel_r if '$(arg wheel_shape)' == 'cylinder' else Rp - cad_wheel_r}"/>
+  <xacro:property name="d0" value="${min(max(h_wall - cad_axle_h - 0.0003, d_lo), d_hi)}"/>   <!-- 관절 0 의 변위: 벽에서 0.3 mm 안쪽에서 시작 -->
+  <xacro:property name="slide_damping" value="10.0"/>   <!-- [N·s/m] 추정 (수치 안정용, 볼부시 마찰 실측 없음) -->
+  <xacro:property name="wheel_damping" value="${$(arg motor_stall)/$(arg motor_no_load)}"/>
+  <xacro:property name="mu_wheel" value="0.7"/>          <!-- 굴림 방향 (PU 롤러 - PVC, airo71 과 같게, 추정) -->
+  <xacro:property name="mu_body" value="0.3"/>           <!-- 외피·모터가 벽에 닿을 때 (추정) -->
+  <xacro:property name="Lb" value="${cad_x_front - cad_x_rear}"/>
+  <xacro:property name="xb" value="${(cad_x_front + cad_x_rear)/2}"/>
+  <xacro:property name="rod_top" value="${cad_rod_top if sp_on else cad_rod_top_short}"/>   <!-- 내경 100 설정은 짧은 봉 (보이는 메시는 긴 봉 그대로) -->
+
+  <material name="c_body"><color rgba="0.44 0.50 0.56 1"/></material>
+  <material name="c_cover"><color rgba="0.85 0.87 0.92 0.35"/></material>
+  <material name="c_slider"><color rgba="0.53 0.81 0.98 1"/></material>
+  <material name="c_motor"><color rgba="0.70 0.70 0.72 1"/></material>
+  <material name="c_metal"><color rgba="0.35 0.35 0.38 1"/></material>
+  <material name="c_spacer"><color rgba="0.87 0.63 0.87 1"/></material>
+  <material name="c_wheel"><color rgba="0.25 0.41 0.88 1"/></material>
+  <material name="c_gear"><color rgba="0.85 0.65 0.13 1"/></material>
+  <material name="mark_yellow"><color rgba="0.95 0.80 0.10 1"/></material>
+
+  <!-- 몸체 충돌체 매크로 (아래 base_link 에서 씀) -->
+  <xacro:macro name="vertex_col" params="k">
+    <xacro:property name="rv" value="${2*cad_tri_d - cad_tri_rv}"/>
+    <xacro:property name="av" value="${cad_tri_vtx + radians(120*k)}"/>
+    <collision>
+      <origin xyz="${xb} ${(cad_tri_rv - rv)*cos(av)} ${(cad_tri_rv - rv)*sin(av)}" rpy="0 ${pi/2} 0"/>
+      <geometry><cylinder radius="${rv}" length="${Lb}"/></geometry>
+    </collision>
+  </xacro:macro>
+  <xacro:macro name="rod_col" params="k x">
+    <xacro:property name="ar" value="${radians(120*k)}"/>
+    <xacro:property name="rc" value="${(rod_top + 0.030)/2}"/>
+    <collision>
+      <origin xyz="${x} ${-rc*sin(ar)} ${rc*cos(ar)}" rpy="${ar} 0 0"/>
+      <geometry><cylinder radius="0.0035" length="${rod_top - 0.030}"/></geometry>
+    </collision>
+  </xacro:macro>
+
+  <!-- ===== 몸체 (base_link): 뒷판 + 기둥 + 앞판 + 가이드봉 + 삼각 외피 ===== -->
+  <link name="base_link">
+    <visual><geometry><mesh filename="${mesh}/body.stl"/></geometry><material name="c_body"/></visual>
+    <visual><geometry><mesh filename="${mesh}/rods.stl"/></geometry><material name="c_metal"/></visual>
+    <xacro:if value="${sp_on}">
+      <visual><geometry><mesh filename="${mesh}/spacers.stl"/></geometry><material name="c_spacer"/></visual>
+    </xacro:if>
+    <visual><geometry><mesh filename="${mesh}/cover.stl"/></geometry><material name="c_cover"/></visual>
+    <!-- 충돌체: 삼각 외피 바깥 모양을 원통 4개로 근사 (모두 실제 바깥 면 안쪽).
+         가운데 원통 = 앞·뒷판 반지름 37, 꼭짓점 원통 3개 = 반지름 32 를 꼭짓점 쪽으로 15 옮김 (바깥 끝 47 = 꼭짓점 반지름).
+         평면 가운데(창 자리)에서는 실제 39.5 보다 2.5 mm 작다 -->
+    <collision>
+      <origin xyz="${xb} 0 0" rpy="0 ${pi/2} 0"/>
+      <geometry><cylinder radius="${cad_plate_r}" length="${Lb}"/></geometry>
+    </collision>
+    <xacro:vertex_col k="0"/>
+    <xacro:vertex_col k="1"/>
+    <xacro:vertex_col k="2"/>
+    <!-- 가이드봉 끝 (긴 봉은 반지름 47 까지 나옴, 스토퍼 반지름 3.5). 짧은 봉은 몸체 원통 안이라 넣지 않음 -->
+    <xacro:if value="${sp_on}">
+      <xacro:rod_col k="0" x="${cad_rod_x0}"/>
+      <xacro:rod_col k="0" x="${cad_rod_x1}"/>
+      <xacro:rod_col k="1" x="${cad_rod_x0}"/>
+      <xacro:rod_col k="1" x="${cad_rod_x1}"/>
+      <xacro:rod_col k="2" x="${cad_rod_x0}"/>
+      <xacro:rod_col k="2" x="${cad_rod_x1}"/>
+    </xacro:if>
+    <xacro:cad_inertial_body/>
+  </link>
+  <xacro:friction link="base_link" mu="${mu_body}"/>
+
+  <!-- ===== 바퀴 유닛 ===== -->
+  <xacro:macro name="unit" params="k">
+    <xacro:property name="a" value="${radians(120*k)}"/>
+    <!-- 직선 관절: 유닛 좌표 z = 반지름 방향. 관절 0 = 변위 d0 (바퀴가 이 배관 벽에 거의 닿은 자리) -->
+    <joint name="u${k}_slide_joint" type="prismatic">
+      <parent link="base_link"/>
+      <child link="u${k}_slider"/>
+      <origin xyz="0 ${-d0*sin(a)} ${d0*cos(a)}" rpy="${a} 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="${d_lo - d0}" upper="${d_hi - d0}" effort="100" velocity="1.0"/>
+      <dynamics damping="${slide_damping}" friction="0"/>
+    </joint>
+    <!-- C202 2개: 힘 = k (d_free - d) 바깥으로 -->
+    <xacro:joint_spring joint="u${k}_slide_joint" k="${cad_spring_k}" ref="${d_free - d0}"/>
+    <link name="u${k}_slider">   <!-- 슬라이더(출력) + 모터 + 웜 + 베어링·부싱. 좌표 = 유닛 좌표 (변위 0 기준 CAD 값 그대로) -->
+      <visual><geometry><mesh filename="${mesh}/slider.stl"/></geometry><material name="c_slider"/></visual>
+      <visual><geometry><mesh filename="${mesh}/motor.stl"/></geometry><material name="c_motor"/></visual>
+      <collision>   <!-- 모터 몸통 (엘보에서 벽에 닿을 수 있는 부분) -->
+        <origin xyz="${(cad_motor_x0 + cad_motor_x1)/2} ${cad_motor_y} ${cad_motor_z}" rpy="0 ${pi/2} 0"/>
+        <geometry><cylinder radius="${cad_motor_r}" length="${cad_motor_x1 - cad_motor_x0}"/></geometry>
+      </collision>
+      <xacro:cad_inertial_unit/>
+    </link>
+    <xacro:friction link="u${k}_slider" mu="${mu_body}"/>
+
+    <!-- 바퀴: 축 = 유닛 y (접선). 벽이 바퀴의 바깥(+z) 쪽이라 축을 뒤집어 + 속도에 앞으로 감 -->
+    <joint name="u${k}_wheel_joint" type="continuous">
+      <parent link="u${k}_slider"/>
+      <child link="u${k}_wheel"/>
+      <origin xyz="0 0 ${cad_axle_h}" rpy="0 0 0"/>
+      <axis xyz="0 -1 0"/>
+      <dynamics damping="${wheel_damping}" friction="0"/>
+    </joint>
+    <link name="u${k}_wheel">   <!-- 옴니휠 + 허브 + 웜휠 + 축 -->
+      <visual><geometry><mesh filename="${mesh}/wheel.stl"/></geometry><material name="c_wheel"/></visual>
+      <visual><geometry><mesh filename="${mesh}/axle.stl"/></geometry><material name="c_gear"/></visual>
+      <visual>
+        <origin xyz="0 ${-cad_wheel_w/2} 0" rpy="0 0 0"/>
+        <geometry><box size="${1.6*cad_wheel_r} 0.001 0.004"/></geometry>
+        <material name="mark_yellow"/>
+      </visual>
+      <collision>
+        <xacro:if value="${'$(arg wheel_shape)' == 'cylinder'}">
+          <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+          <geometry><cylinder radius="${cad_wheel_r}" length="${cad_wheel_w}"/></geometry>
+        </xacro:if>
+        <xacro:if value="${'$(arg wheel_shape)' != 'cylinder'}"><geometry><sphere radius="${cad_wheel_r}"/></geometry></xacro:if>
+      </collision>
+      <xacro:cad_inertial_wheel/>
+    </link>
+    <!-- 옴니휠: 롤러 대신 방향별 마찰 (airo71 과 같은 방식·같은 바퀴 Nexus 38 mm). 바퀴 축 방향 mu1 = 0 (옆으로 미끄러짐), 굴림 방향 mu2 -->
+    <gazebo reference="u${k}_wheel">
+      <mu1>0.0</mu1>
+      <mu2>${mu_wheel}</mu2>
+      <fdir1>0 1 0</fdir1>
+    </gazebo>
+    <xacro:joint_force joint="u${k}_wheel_joint"/>
+  </xacro:macro>
+  <xacro:unit k="0"/>
+  <xacro:unit k="1"/>
+  <xacro:unit k="2"/>
+
+  <!-- ===== 임시 뒤 받침 (rear_support:=true 일 때만, 시뮬 전용) =====
+       이 모듈은 바퀴 3개가 한 단면에 있어 혼자서는 뒤가 처진다. 실물에서 그 기울기를 잡을 뒤 마디·관절이 아직 없어서,
+       직관 주행을 시험할 수 있게 뒷판 자리에 미끄럼 받침(구) 3개를 고정으로 둔 것이다. 실물 설계안이 아니다.
+       받침 끝은 배관 벽에서 rear_gap 만큼 떨어져 있다 (배관 내경에 맞춰 자동). 방향은 삼각 외피의 꼭짓점 세 곳.
+       고정 받침이라 벽과의 틈이 일정해야 한다: 직관용. 엘보·이음부 턱에서는 걸릴 수 있다.
+       마찰 0.05 (추정, 미끄럼 받침 흉내). 질량은 1 g 씩으로 두어 몸체 질량에 거의 영향이 없다 -->
+  <xacro:if value="$(arg rear_support)">
+    <xacro:property name="skid_r" value="0.004"/>
+    <xacro:property name="skid_c" value="${Rp - $(arg rear_gap) - skid_r}"/>   <!-- 받침 구 중심의 반지름 -->
+    <xacro:macro name="rear_skid" params="k">
+      <xacro:property name="a_s" value="${cad_tri_vtx + radians(120*k)}"/>
+      <joint name="rear_skid${k}_fix" type="fixed">
+        <parent link="base_link"/>
+        <child link="rear_skid${k}"/>
+        <origin xyz="${cad_x_rear + skid_r} ${skid_c*cos(a_s)} ${skid_c*sin(a_s)}" rpy="0 0 0"/>
+      </joint>
+      <link name="rear_skid${k}">
+        <visual><geometry><sphere radius="${skid_r}"/></geometry><material name="c_temp"/></visual>
+        <collision><geometry><sphere radius="${skid_r}"/></geometry></collision>
+        <xacro:inertial_sphere m="0.001" r="${skid_r}"/>
+      </link>
+      <xacro:friction link="rear_skid${k}" mu="0.05"/>
+    </xacro:macro>
+    <material name="c_temp"><color rgba="1.0 0.45 0.0 1"/></material>
+    <xacro:rear_skid k="0"/>
+    <xacro:rear_skid k="1"/>
+    <xacro:rear_skid k="2"/>
+  </xacro:if>
+
+  <!-- IMU 자리는 미정 (몸체 원점에 둠) -->
+  <xacro:sim_common imu_parent="base_link"/>
+</robot>

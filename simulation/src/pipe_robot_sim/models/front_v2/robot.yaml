@@ -1,0 +1,18 @@
+# 앞 모듈 v2 단독 (바퀴 유닛 3개). 모양은 front_v2.urdf.xacro, 치수·질량은 cad_params.xacro (CAD 에서 자동 생성)
+# 모터 값은 FIT0522 판매 표기를 웜 1:16 뒤 바퀴 축 기준으로 바꾼 것. 웜 효율 0.35 는 추정
+/**:
+  ros__parameters:
+    wheel_joints: [u0_wheel_joint, u1_wheel_joint, u2_wheel_joint]
+    wheel_radius: 0.01905         # Nexus 38 mm 옴니휠 [도면]
+    encoder_cpr: 13170            # 모터 출력축 823.1 x 웜 16 [계산, 계수 정의는 실측 확인]
+    motor_stall_torque: 3.57      # 바퀴 축 [N·m] = 0.637 (6.5 kg·cm) x 16 x 효율 0.35 [추정]. xacro motor_stall 과 같게
+    motor_no_load_speed: 0.654    # 바퀴 축 [rad/s] = 100 rpm / 16 -> 약 12.5 mm/s. xacro motor_no_load 와 같게
+    supply_voltage: 6.0           # 모터 정격으로 둠 (전원 구성 미정)
+    rated_voltage: 6.0
+    spawn_x: 0.15                 # base_link 원점 = 바퀴 축 평면. 몸체 뒤끝(-0.0855)이 입구 안쪽에 들어가게
+    body_len: 0.1085
+    tof: false
+    bench_spines: [base_link]
+    # 물리 설정: 같은 옴니휠(방향별 마찰)을 쓰는 airo71 과 같게 둠. 이 모델로는 아직 시험하지 않음
+    dart_collision_detector: ode
+    pipe_box_collision: false

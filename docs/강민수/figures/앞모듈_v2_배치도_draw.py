@@ -43,8 +43,12 @@ def zig(ax, x, y0, y1, w=3.25, n=12):
 
 # ---------------- 덮개: CAD 조각에서 직접 샘플 ----------------
 PETALS = [p.val() for p in F.cover_parts()]
-RS = (F.COV_RI + F.COV_RO) / 2
+RR = np.arange(36.25, F.TRI_RV + .3, .25)                        # 덮개(삼각 외피)를 찾는 반지름 범위
 def cover_at(x, y, z): return any(p.isInside(cq.Vector(x, y, z)) for p in PETALS)
+def cover_span(phi_deg, z):
+    """각 phi 방향에서 덮개가 있는 반지름 구간 (없으면 None)."""
+    c, s = np.cos(np.radians(phi_deg)), np.sin(np.radians(phi_deg)); hit = [r for r in RR if cover_at(r * c, r * s, z)]
+    return (min(hit) - .125, max(hit) + .125) if hit else None
 def runs(flags, vals):
     out, st = [], None
     for v, f in zip(vals, flags):
@@ -53,11 +57,18 @@ def runs(flags, vals):
     if st is not None: out.append((st, vals[-1]))
     return out
 def cover_front(ax, zc, ls, fc):
-    phi = np.arange(0, 360, 0.5)
-    for t0, t1 in runs([cover_at(RS * np.cos(np.radians(p)), RS * np.sin(np.radians(p)), zc) for p in phi], phi):
-        ax.add_patch(Wedge((0, 0), F.COV_RO, t0, t1, width=F.COV_RO - F.COV_RI, fc=fc, ec="k", lw=.8, ls=ls, zorder=7, alpha=.9))
+    phi = np.arange(0, 360, 1.0); sp = [cover_span(p, zc) for p in phi]; i = 0
+    while i < len(phi):
+        if sp[i] is None: i += 1; continue
+        j = i
+        while j + 1 < len(phi) and sp[j + 1] is not None: j += 1
+        a = np.radians(phi[i:j + 1]); ro = np.array([sp[k][1] for k in range(i, j + 1)]); ri = np.array([sp[k][0] for k in range(i, j + 1)])
+        pts = np.r_[np.c_[ro * np.cos(a), ro * np.sin(a)], np.c_[ri * np.cos(a), ri * np.sin(a)][::-1]]
+        ax.add_patch(Polygon(pts, closed=True, fc=fc, ec="k", lw=.8, ls=ls, zorder=7, alpha=.9)); i = j + 1
 ZS = np.arange(F.Z_REAR, F.Z_FRONT + .01, .5)
-COVER_SIDE = runs([cover_at(0, RS, z) for z in ZS], ZS)          # 유닛 0 중심선(각 0°) 위치
+_side = [cover_span(90, z) for z in ZS]                            # 유닛 0 중심선(바퀴 방향) 위치
+COVER_SIDE = [(z0, z1, min(s[0] for s, z in zip(_side, ZS) if s and z0 <= z <= z1), max(s[1] for s, z in zip(_side, ZS) if s and z0 <= z <= z1))
+              for z0, z1 in runs([s is not None for s in _side], ZS)]
 
 # ---------------- 유닛 그리기 (CAD 치수) ----------------
 def unit_front(ax, a, M=np.eye(2), full=True):
@@ -81,7 +92,7 @@ def unit_side(ax, a, cover=True):
     """유닛 0 옆모습 (x 쪽에서 본 투영, 모터는 옆으로 25 떨어져 있음)."""
     my = a - CD; e = a - F.EAR_OFF
     if cover:
-        for z0, z1 in COVER_SIDE: ax.add_patch(Rectangle((z0, F.COV_RI), z1 - z0, F.COV_RO - F.COV_RI, fc=C["cover"], ec="k", lw=.6, zorder=2))
+        for z0, z1, r0, r1 in COVER_SIDE: ax.add_patch(Rectangle((z0, r0), z1 - z0, r1 - r0, fc=C["cover"], ec="k", lw=.6, zorder=2))
     for z0, z1, y0, y1 in ((-9.5, 6, a - 5, a + 5.05), (-9.5, -6.5, my - 5, a - 5), (-44, -9.3, my + 13, my + 16), (-9.4, 5.05, my + 13, a + 5.05)) + \
                           tuple((gz - F.EAR_W, gz + F.EAR_W, e, e + F.EAR_H) for gz in F.GUIDE_Z):
         ax.add_patch(Rectangle((z0, y0), z1 - z0, y1 - y0, fc=C["slider"], ec="k", lw=.6, alpha=.45, zorder=3))
@@ -122,8 +133,8 @@ def fig_layout(paths):
     ax.add_patch(Circle((0, 0), 7.5, fc="#6d7785", ec="k", lw=1, zorder=9)); ax.add_patch(Circle((0, 0), 4, fc="w", ec="k", lw=.8, zorder=9))
     dim(ax, (-60, -72), (60, -72), "배관 내경 Ø120 (점선: 이음부 Ø123.8)", va="top", off=(0, -1))
     for x in (-60, 60): ax.plot([x, x], [0, -74], color="k", lw=.4, ls=":")
-    dim(ax, (-F.COV_RO, -64), (F.COV_RO, -64), f"덮개 Ø{2*F.COV_RO:.0f} (한 덩어리, 두께 2~4, 유닛마다 창)")
-    for x in (-F.COV_RO, F.COV_RO): ax.plot([x, x], [0, -66], color="k", lw=.4, ls=":")
+    dim(ax, (-F.TRI_RV, -64), (F.TRI_RV, -64), f"삼각 외피: 평면 거리 {F.TRI_D:g}, 최대 반지름 {F.TRI_RV:g} (한 덩어리, 유닛마다 창)")
+    for x in (-F.TRI_RV, F.TRI_RV): ax.plot([x, x], [0, -66], color="k", lw=.4, ls=":")
     dim(ax, (-11.5, 64), (11.5, 64), "바퀴 폭 23")
     lab(ax, (8, 56), (26, 72), "옴니휠 Ø38.1")
     lab(ax, (MX, A_SET - CD - 9), (58, 18), f"모터 FIT0522 Ø25 (길이 방향, 바퀴 뒤)\n바퀴 중심선에서 옆으로 {MX:.0f}")
@@ -132,7 +143,7 @@ def fig_layout(paths):
     lab(ax, (-15.5, A_SET + 5), (-46, 66), "허브 (M2×4, PCD 12)", ha="right")
     lab(ax, (17, A_SET + 3), (-6, 76), "지지판 B·C (MF74ZZ 각 1, 베어링 간격 15)", ha="center")
     lab(ax, (0, 14), (-50, -10), f"가이드봉 Ø4 + 스페이서 {F.SPACER:.0f}\n+ 스프링 C202 (바퀴당 2개, 바퀴 뒤)", ha="right")
-    lab(ax, (-30, 22), (-66, 24), "덮개 (진한 회색: z 0 단면\n점선: 모터 구간 z -50)", ha="right")
+    lab(ax, ((F.TRI_RV - 2) * np.cos(np.radians(132)), (F.TRI_RV - 2) * np.sin(np.radians(132))), (-66, 24), "삼각 외피 (진한 회색: z 0 단면\n점선: 모터 구간 z -50)", ha="right")
     lab(ax, (-25, -24), (-66, -40), f"앞·뒷판 Ø{2*F.PLATE_R:.0f} (회색 점선)", ha="right")
     lab(ax, (3, -2), (-66, -54), "가운데 기둥 Ø15 / 안 Ø8 (배선)", ha="right")
     ax.text(0, -84, "점선 원 = 모터, 점선 사각 = 모터 위 막대 (바퀴 뒤, 투영). 전자 부품(MDD3A·ESP32)은 이 모듈에 없음", ha="center", fontsize=9, color="#444")
@@ -159,13 +170,13 @@ def fig_layout(paths):
     lab(ax, (-25, 20), (F.Z_REAR - 43, 76), f"스프링 C202 (설치 길이 {spring_len(A_SET):.1f})")
     lab(ax, (-40, F.SEAT_Y + F.SPACER / 2), (F.Z_REAR - 43, 69), f"스페이서 {F.SPACER:.0f} (내경 100용은 뺌)")
     lab(ax, (-25, F.ROD_TOP - 1), (6, 70), "스토퍼 (바깥 끝 = 바퀴 축 43.95)")
-    lab(ax, (-70, F.COV_RO - 1), (-75, 50), "덮개 (유닛 중심선 위치,\n창 구간은 비어 있음)", ha="center")
+    lab(ax, (-70, F.TRI_RV - 1.5), (-112, 52), "삼각 외피 (유닛 중심선 위치,\n창 구간은 비어 있음)", ha="center")
     lab(ax, (-20, A_SET - CD + 14), (2, 76), "슬라이더 (연한 파랑: 지지판 B·C·모터 위 막대·반원 받침·귀)")
     lab(ax, (F.Z_FRONT + 1.5, 4), (F.Z_FRONT + 8, -8), "ToF\n(앞판, 미선정)")
     ax.set_xlim(F.Z_REAR - 45, F.Z_FRONT + 40); ax.set_ylim(-66, 80)
     ax = fig.add_axes([.46, .03, .53, .31]); ax.axis("off")
     t1 = ("■ 주요 치수\n"
-          f"· 배관 내경 120 (시연) / 덮개 Ø{2*F.COV_RO:.0f} / 길이 {L_MOD:.1f}\n"
+          f"· 배관 내경 120 (시연) / 삼각 외피 최대 반지름 {F.TRI_RV:.0f} / 길이 {L_MOD:.1f}\n"
           "· 모터 FIT0522: 기어박스 23 + 모터 31 + 엔코더 9, 축 14.5 [도면]\n"
           "· 웜을 D축(장착면 +4.5~14.5)에 직접 → 슬리브·웜 축 없음\n"
           f"· 가이드봉 Ø4 × {F.ROD_TOP - F.ROD_Y0:.1f} (반지름 {F.ROD_Y0}~{F.ROD_TOP:.0f}), 바퀴당 2개, 모두 바퀴 뒤\n"
@@ -184,7 +195,7 @@ def fig_layout(paths):
           "\n■ 확인·구매가 필요한 것\n"
           "· 구매: MF74ZZ ×6, 스러스트 와셔 ×3, 봉 끝 스토퍼 ×6\n"
           f"· 가이드봉 {F.ROD_TOP - F.ROD_Y0:.1f} (Ø4 샤프트 절단), 부싱 LM4UU 4×8×12\n"
-          "· 웜·웜휠은 출력 (PETG 권장, 그리스)\n"
+          "· 웜·웜휠은 출력 (PLA, 그리스)\n"
           "· FIT0522 플러그 방향·길이, 나사 간격\n"
           "· C202 안지름 > 4 인지\n"
           "· MDD3A 2개·ESP32는 뒤 마디 (모터선 6가닥 × 3이 관절 통과)")
