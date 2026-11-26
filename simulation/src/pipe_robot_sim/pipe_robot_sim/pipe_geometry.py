@@ -209,7 +209,9 @@ def world_sdf(builder, world_name='pipe_world', cutaway=True, visual_mesh=None, 
               sensor_mesh=None):
     """visual_mesh / collision_mesh: STL 경로. 주면 메시 하나로, 없으면 박스마다.
     sensor_mesh: 잘라내지 않은 배관 STL. ToF(gpu_lidar) 전용 (visibility 0x02 + 완전 투명이라 GUI 화면엔 안 보임),
-                 주면 렌더링 센서용 Sensors 시스템도 켬."""
+                 주면 렌더링 센서용 Sensors 시스템도 켬.
+    시험용 환경변수: PIPE_STEP (스텝 [s]), PIPE_PHYSICS_EXTRA (physics 안에 넣을 SDF),
+                    PIPE_GRAVITY (중력 벡터 "x y z", 기본 "0 0 -9.81". 엘보 통과에서 중력 방향 영향을 볼 때)"""
     links = []
     if sensor_mesh:
         links.append(
@@ -252,7 +254,7 @@ def world_sdf(builder, world_name='pipe_world', cutaway=True, visual_mesh=None, 
     <plugin filename="ignition-gazebo-user-commands-system" name="ignition::gazebo::systems::UserCommands"/>
     <plugin filename="ignition-gazebo-scene-broadcaster-system" name="ignition::gazebo::systems::SceneBroadcaster"/>
     <plugin filename="ignition-gazebo-imu-system" name="ignition::gazebo::systems::Imu"/>{sensors_sys}
-    <gravity>0 0 -9.81</gravity>
+    <gravity>{os.environ.get('PIPE_GRAVITY', '0 0 -9.81')}</gravity>
     <scene><ambient>0.6 0.6 0.6 1</ambient><background>0.75 0.8 0.85 1</background></scene>
     <light type="directional" name="sun">
       <cast_shadows>false</cast_shadows>

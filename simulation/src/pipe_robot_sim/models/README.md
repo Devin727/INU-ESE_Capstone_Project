@@ -4,6 +4,8 @@
 
 - `snake_v`: 뱀형 V자 (PIRATE 방식) 기준 모델. 수평 좌·우, 위 90° 엘보 통과 (oracle 제어)
 - `snake_v2`: `snake_v` + 실제 부품 + 꼬리 끝 탐촉자 (D안). 엘보 통과 미해결
+- `snake_v3`: `snake_v` + 구매 가능 서보 토크 (J1·J5·J3 0.52, J2·J4·J6 0.34 N·m). 수평 좌·우 엘보 18/18 통과 (oracle 제어)
+- `wp6`: 벽 밀착 6륜 2모듈 (지도교수 개념도). 가운데 관절 서보 2개 + `wp_ctrl`. 굴림을 엘보 방향에 맞추면 4방향 90° 통과 (oracle)
 - `front_v2`: 앞 모듈 v2 단독 (바퀴 유닛 3개 120° 간격, 직선 서스펜션 + 옴니휠, 삼각 외피). `cad_params.xacro`와 `meshes/`는 `docs/강민수/cad/v2/urdf_export.py`가 CAD에서 만든 파일. 혼자서는 뒤가 처지므로 직관 시험은 `PIPE_XACRO_ARGS='rear_support=true'` (시뮬 전용 임시 뒤 받침, 실물 설계 아님). **Gazebo 미실행** (2026-11-26, xacro 풀이와 값 검사만 함: `docs/강민수/cad/v2/urdf_check_results.txt`)
 - `common/common.xacro`: 공통 매크로 (관성, 옴니휠 롤러, 시뮬 플러그인)
 

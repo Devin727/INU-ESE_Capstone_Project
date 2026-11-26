@@ -1,0 +1,202 @@
+<?xml version="1.0"?>
+<!-- wp6: 벽 밀착 6륜 2모듈 로봇 (2026-10-31, 지도교수 개념도 "수평·수직 배관 이동 로봇"을 시뮬로 옮긴 후보 모델)
+     구조: 앞 모듈 ─ 가운데 굽힘 관절 ─ 뒤 모듈. 모듈마다 스프링 다리 3개 (축 둘레 120°), 다리 끝에 구동 바퀴 (N20)
+       - 다리: 반경 방향 직선 슬라이더 + 압축 스프링 (실물은 평행 링크로 바퀴를 거의 반경 방향으로 움직이는 구조를 가정)
+         처음에는 뒤로 뻗는 끌림 팔 + 토션 스프링으로 만들었는데, DART 에서 팔 떨림이 비스듬한 팔에 정류되어
+         모터를 끈 채로도 로봇이 2~5 cm/s 로 혼자 뒤로 갔음 (팔 고정이면 멈춤, 2026-10-31). 그래서 슬라이더로 바꿈
+       - 가운데 관절: 유니버설 관절 (피치 + 요). 기본은 서보 2개로 wp_ctrl 노드가 앞 모듈을 엘보 쪽으로 굽힘.
+         수동 토션 스프링(mid_mode spring)은 R61 엘보 입구에서 앞 바퀴 줄이 바깥 벽에 정면으로 막혀 못 지나감 (2026-10-31)
+         (모듈마다 바퀴가 한 줄이라 관절이 약하면 무게로 가운데가 처짐: 스프링 0.3 N·m/rad 에서 0.23 rad)
+       - 바퀴 6개 모두 구동. 엘보에서 안쪽·바깥 바퀴 속도가 크게 달라서 motor_driver diff (같은 토크) 로 돌림
+     좌표: base_link = 앞 모듈 몸통, 원점 = 몸통 가운데, 앞 = +x, 위 = z. 다리 0 번이 위 (+z), 1·2 번은 120° 씩.
+     다리 변위 q [m]: 0 = 직관에서 바퀴가 벽에 닿는 위치, + = 바깥으로.
+     치수·질량·스프링은 모두 추정 (docs/08). 부품 상자(배터리·보드·카메라)는 몸통 질량에 포함 -->
+<robot name="wp6" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="pipe_inner_d" default="0.1008"/>
+  <xacro:arg name="params_file" default=""/>
+  <xacro:arg name="suspension" default="all"/>
+  <xacro:include filename="$(find pipe_robot_sim)/models/common/common.xacro"/>
+
+  <!-- ===== 치수 (추정) ===== -->
+  <xacro:property name="Rp" value="${$(arg pipe_inner_d)/2}"/>
+  <xacro:property name="Lb" value="0.090"/>     <!-- 모듈 몸통 길이 -->
+  <xacro:property name="rb" value="0.022"/>     <!-- 몸통 반경 (Ø44) -->
+  <xacro:property name="gap" value="0.010"/>    <!-- 몸통 끝 ~ 가운데 관절 -->
+  <xacro:property name="rw" value="0.015"/>     <!-- 바퀴 반경 (Ø30, N20 용 고무 바퀴) -->
+  <xacro:property name="ww" value="0.010"/>     <!-- 바퀴 폭 -->
+  <xacro:property name="Rc" value="${Rp - rw}"/>   <!-- 직관에서 바퀴 중심의 반경 위치 -->
+  <!-- 바퀴 줄 위치: 두 줄 사이를 넓게 (앞 모듈 앞쪽, 뒤 모듈 뒤쪽) -->
+  <xacro:arg name="ring_in" default="0.020"/>   <!-- 몸통 끝에서 바퀴 줄까지 [m] -->
+  <xacro:property name="x_ring_f" value="${Lb/2 - $(arg ring_in)}"/>
+  <xacro:property name="x_ring_r" value="${-gap - Lb + $(arg ring_in)}"/>   <!-- rear_body 좌표 -->
+
+  <!-- 질량 (몸통은 목표값, 나머지 추정). 총 약 0.44 kg -->
+  <xacro:arg name="mass_scale" default="1.0"/>
+  <xacro:property name="m_body" value="${0.12*$(arg mass_scale)}"/>   <!-- 몸통 (배터리·보드·카메라 포함). 목표값: 위 엘보 실시간 3개씩 실행에서 0.12 kg 6/6, 0.15 kg 1/3 (+1회 58 s), 0.25 kg 실패 (2026-10-31) -->
+  <xacro:property name="m_leg" value="0.020"/>    <!-- 다리 + N20 모터 -->
+  <xacro:property name="m_wheel" value="0.012"/>
+  <xacro:property name="m_cross" value="0.015"/>  <!-- 유니버설 관절 십자 -->
+
+  <!-- 다리 스프링: 힘 = k (ref - q). 직관(q = 0)에서 바퀴 누름력 leg_preload [N]
+       강성은 몸통이 무게로 처지는 양을 줄이는 값: 모듈 무게 약 3.5 N / (1.5 x 1000 N/m) = 약 2 mm -->
+  <xacro:arg name="leg_k" default="1000"/>         <!-- [N/m] -->
+  <xacro:arg name="leg_preload" default="8.0"/>    <!-- [N] -->
+  <xacro:property name="leg_ref" value="${$(arg leg_preload)/$(arg leg_k)}"/>
+  <xacro:property name="leg_in" value="0.015"/>    <!-- 안쪽으로 줄어드는 최대 [m] -->
+  <xacro:property name="leg_out" value="0.015"/>   <!-- 바깥으로 늘어나는 최대 [m] -->
+  <xacro:arg name="leg_damping" default="2.0"/>    <!-- [N·s/m] -->
+
+  <!-- 가운데 관절: servo = 서보 2개 (wp_ctrl 이 각도 명령), spring = 수동 토션 스프링 (R61 엘보 통과 못 함, docs/05) -->
+  <xacro:arg name="mid_mode" default="servo"/>
+  <xacro:arg name="mid_tmax" default="0.52"/>       <!-- 서보 토크 한계 [N·m] (XL330-M288-T 스톨, 추정) -->
+  <xacro:arg name="mid_p" default="3.0"/>           <!-- 서보 위치 게인 [N·m/rad] -->
+  <xacro:arg name="mid_k" default="2.0"/>           <!-- spring 일 때 [N·m/rad] -->
+  <xacro:arg name="mid_lim" default="1.4"/>         <!-- [rad] 약 80° -->
+
+  <!-- 바퀴 모터: N20 1:100 추정 (스톨 0.147 N·m, 무부하 16.8 rad/s), 감쇠 = 스톨/무부하 -->
+  <xacro:arg name="motor_stall" default="0.147"/>
+  <xacro:property name="wheel_damping" value="${$(arg motor_stall)/16.8}"/>
+  <xacro:arg name="mu_wheel" default="0.8"/>
+  <xacro:property name="mu_wheel" value="$(arg mu_wheel)"/>   <!-- 고무 바퀴 ↔ PVC, 추정 -->
+
+  <material name="body_white"><color rgba="0.88 0.88 0.9 1"/></material>
+  <material name="band_blue"><color rgba="0.2 0.4 0.85 1"/></material>
+  <material name="leg_orange"><color rgba="0.95 0.55 0.1 1"/></material>
+  <material name="tire_black"><color rgba="0.12 0.12 0.12 1"/></material>
+  <material name="mark_yellow"><color rgba="0.95 0.8 0.1 1"/></material>
+  <material name="cam_black"><color rgba="0.05 0.05 0.05 1"/></material>
+
+  <!-- ===== 매크로 ===== -->
+  <!-- 스프링 구현: pd = 위치 제어기 (명시적), implicit = DART 관절 스프링 -->
+  <xacro:arg name="spring_impl" default="pd"/>
+  <xacro:macro name="spring" params="joint k ref tmax">
+    <xacro:if value="${'$(arg spring_impl)' == 'pd'}"><xacro:joint_pd_spring joint="${joint}" k="${k}" ref="${ref}" tmax="${tmax}"/></xacro:if>
+    <xacro:if value="${'$(arg spring_impl)' != 'pd'}"><xacro:joint_spring joint="${joint}" k="${k}" ref="${ref}"/></xacro:if>
+  </xacro:macro>
+
+  <!-- 모듈 몸통: 캡슐 충돌체 (모서리가 엘보 안쪽에 걸리지 않게) -->
+  <xacro:macro name="body" params="name cx">
+    <link name="${name}">
+      <visual>
+        <origin xyz="${cx} 0 0" rpy="0 ${pi/2} 0"/>
+        <geometry><cylinder radius="${rb}" length="${Lb}"/></geometry>
+        <material name="body_white"/>
+      </visual>
+      <visual>
+        <origin xyz="${cx} 0 0" rpy="0 ${pi/2} 0"/>
+        <geometry><cylinder radius="${rb + 0.001}" length="0.012"/></geometry>
+        <material name="band_blue"/>
+      </visual>
+      <collision>
+        <origin xyz="${cx} 0 0" rpy="0 ${pi/2} 0"/>
+        <geometry><cylinder radius="${rb}" length="${Lb - 2*rb}"/></geometry>
+      </collision>
+      <collision><origin xyz="${cx + Lb/2 - rb} 0 0"/><geometry><sphere radius="${rb}"/></geometry></collision>
+      <collision><origin xyz="${cx - Lb/2 + rb} 0 0"/><geometry><sphere radius="${rb}"/></geometry></collision>
+      <xacro:inertial_cyl m="${m_body}" r="${rb}" l="${Lb}" xyz="${cx} 0 0" rpy="0 ${pi/2} 0"/>
+    </link>
+  </xacro:macro>
+
+  <!-- 스프링 다리 + 구동 바퀴. phi: 축 둘레 각 (0 = 위). 다리 좌표: x = 몸통 축, z = 반경 바깥, y = 바퀴 축 (접선)
+       다리 원점 = 직관에서의 바퀴 중심 -->
+  <xacro:macro name="leg" params="name parent x phi">
+    <joint name="${name}_leg_joint" type="prismatic">
+      <parent link="${parent}"/>
+      <child link="${name}_leg"/>
+      <origin xyz="${x} ${-Rc*sin(phi)} ${Rc*cos(phi)}" rpy="${phi} 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="${-leg_in}" upper="${leg_out}" effort="100" velocity="1"/>
+      <dynamics damping="$(arg leg_damping)" friction="0"/>
+    </joint>
+    <xacro:spring joint="${name}_leg_joint" k="$(arg leg_k)" ref="${leg_ref}" tmax="50"/>
+    <link name="${name}_leg">
+      <visual>   <!-- 다리 (몸통까지) -->
+        <origin xyz="0 0 ${-(Rc - rb)/2}" rpy="0 0 0"/>
+        <geometry><box size="0.008 0.006 ${Rc - rb}"/></geometry>
+        <material name="leg_orange"/>
+      </visual>
+      <visual>   <!-- N20 모터 (바퀴 옆) -->
+        <origin xyz="0 ${-ww/2 - 0.006} 0" rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="0.006" length="0.012"/></geometry>
+        <material name="body_white"/>
+      </visual>
+      <xacro:inertial_box m="${m_leg}" x="0.012" y="0.012" z="0.012"/>
+    </link>
+    <!-- spin -1: 바퀴 바깥쪽(벽 쪽)이 닿으므로 축을 뒤집어 + 속도 명령에 앞으로 감 -->
+    <joint name="${name}_wheel_joint" type="continuous">
+      <parent link="${name}_leg"/>
+      <child link="${name}_wheel"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <axis xyz="0 -1 0"/>
+      <dynamics damping="${wheel_damping}" friction="0"/>
+    </joint>
+    <link name="${name}_wheel">
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="${rw}" length="${ww}"/></geometry>
+        <material name="tire_black"/>
+      </visual>
+      <visual>   <!-- 회전 표시 -->
+        <origin xyz="0 ${ww/2} 0" rpy="${pi/2} 0 0"/>
+        <geometry><box size="${1.6*rw} 0.004 0.001"/></geometry>
+        <material name="mark_yellow"/>
+      </visual>
+      <collision><geometry><sphere radius="${rw}"/></geometry></collision>
+      <xacro:inertial_cyl m="${m_wheel}" r="${rw}" l="${ww}" rpy="${pi/2} 0 0"/>
+    </link>
+    <xacro:friction link="${name}_wheel" mu="${mu_wheel}"/>
+    <xacro:joint_force joint="${name}_wheel_joint"/>
+  </xacro:macro>
+
+  <!-- ===== 앞 모듈 (base_link) ===== -->
+  <xacro:body name="base_link" cx="0"/>
+  <link name="camera_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 ${pi/2} 0"/>
+      <geometry><cylinder radius="0.008" length="0.004"/></geometry>
+      <material name="cam_black"/>
+    </visual>
+  </link>
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <origin xyz="${Lb/2 + 0.002} 0 0" rpy="0 0 0"/>
+  </joint>
+  <xacro:leg name="f0" parent="base_link" x="${x_ring_f}" phi="0"/>
+  <xacro:leg name="f1" parent="base_link" x="${x_ring_f}" phi="${2*pi/3}"/>
+  <xacro:leg name="f2" parent="base_link" x="${x_ring_f}" phi="${-2*pi/3}"/>
+
+  <!-- ===== 가운데 유니버설 관절 (피치 -> 요) ===== -->
+  <joint name="mid_pitch_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="mid_cross"/>
+    <origin xyz="${-Lb/2 - gap} 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="${-$(arg mid_lim)}" upper="$(arg mid_lim)" effort="10" velocity="5"/>
+    <dynamics damping="0.07" friction="0"/>   <!-- 서보 감쇠 (snake_v 와 같음) -->
+  </joint>
+  <xacro:if value="${'$(arg mid_mode)' == 'servo'}"><xacro:joint_servo joint="mid_pitch_joint" p="$(arg mid_p)" d="0" tmax="$(arg mid_tmax)"/></xacro:if>
+  <xacro:if value="${'$(arg mid_mode)' != 'servo'}"><xacro:spring joint="mid_pitch_joint" k="$(arg mid_k)" ref="0" tmax="10"/></xacro:if>
+  <link name="mid_cross">
+    <visual><geometry><sphere radius="0.010"/></geometry><material name="band_blue"/></visual>
+    <xacro:inertial_sphere m="${m_cross}" r="0.010"/>
+  </link>
+  <joint name="mid_yaw_joint" type="revolute">
+    <parent link="mid_cross"/>
+    <child link="rear_body"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="${-$(arg mid_lim)}" upper="$(arg mid_lim)" effort="10" velocity="5"/>
+    <dynamics damping="0.07" friction="0"/>
+  </joint>
+  <xacro:if value="${'$(arg mid_mode)' == 'servo'}"><xacro:joint_servo joint="mid_yaw_joint" p="$(arg mid_p)" d="0" tmax="$(arg mid_tmax)"/></xacro:if>
+  <xacro:if value="${'$(arg mid_mode)' != 'servo'}"><xacro:spring joint="mid_yaw_joint" k="$(arg mid_k)" ref="0" tmax="10"/></xacro:if>
+
+  <!-- ===== 뒤 모듈 ===== -->
+  <xacro:body name="rear_body" cx="${-gap - Lb/2}"/>
+  <xacro:leg name="r0" parent="rear_body" x="${x_ring_r}" phi="0"/>
+  <xacro:leg name="r1" parent="rear_body" x="${x_ring_r}" phi="${2*pi/3}"/>
+  <xacro:leg name="r2" parent="rear_body" x="${x_ring_r}" phi="${-2*pi/3}"/>
+
+  <xacro:sim_common imu_parent="base_link"/>
+</robot>
